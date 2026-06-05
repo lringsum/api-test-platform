@@ -6,7 +6,7 @@ This project is now organized for a clean GitHub push and a straightforward Verc
 
 - `.gitignore` to keep local artifacts out of Git.
 - `.vercelignore` to keep local-only files out of Vercel uploads.
-- `index.py` as the Vercel-friendly Flask entry point.
+- `api/index.py` as the Vercel-friendly Flask entry point.
 - `vercel.json` with a longer function timeout for this app.
 - `public/` for CSS and JS so Vercel can serve static assets cleanly.
 
@@ -44,7 +44,7 @@ If you want persistent data on Vercel, switch `DATABASE_URL` to a hosted databas
 
 ## Entry point
 
-Vercel should use `index.py`:
+Vercel should use `api/index.py`:
 
 ```python
 from app import create_app
