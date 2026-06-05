@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}执行报告{% endblock %}
+{% block page_title %}执行报告 #{{ report.id }}{% endblock %}
+{% block page_desc %}查看统计概览、失败摘要和执行明细{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div class="text-muted">执行批次</div>
+                <div class="fs-4">{{ report.data.execution_id }}</div>
+                <small class="text-muted">&nbsp;</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div class="text-muted">总用例数</div>
+                <div class="fs-4">{{ report.data.total_count }}</div>
+                <small class="text-muted">&nbsp;</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div class="text-muted">通过率</div>
+                <div class="fs-4">{{ report.data.pass_rate }}%</div>
+                <small class="text-muted">&nbsp;</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body d-flex flex-column justify-content-between">
+                <div class="text-muted">平均耗时</div>
+                <div class="fs-4">{{ '%.2f'|format((report.data.total_duration_ms / report.data.total_count) if report.data.total_count > 0 else 0) }} ms</div>
+                <small class="text-muted">总耗时：{{ report.data.total_duration_ms }} ms</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-white"><strong>报告摘要</strong></div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <strong>状态：</strong>
+                {% if report.data.status == 'passed' %}
+                <span class="badge bg-success">成功</span>
+                {% else %}
+                <span class="badge bg-danger">失败</span>
+                {% endif %}
+            </div>
+            <div class="col-md-3"><strong>通过：</strong>{{ report.data.passed_count }}</div>
+            <div class="col-md-3"><strong>失败：</strong>{{ report.data.failed_count }}</div>
+            <div class="col-md-3"><strong>生成时间：</strong>{{ report.created_at | bjt }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-white"><strong>执行明细汇总</strong></div>
+    <div class="card-body">
+        {% if report.data.details %}
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered">
+                <thead>
+                <tr>
+                    <th>用例名称</th>
+                    <th>状态</th>
+                    <th>耗时(ms)</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in report.data.details %}
+                <tr>
+                    <td>{{ item.testcase_name }}</td>
+                    <td>
+                        {% if item.status == 'passed' %}
+                        <span class="badge bg-success">通过</span>
+                        {% else %}
+                        <span class="badge bg-danger">失败</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.duration_ms }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-box">暂无执行明细汇总</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-white"><strong>失败用例列表</strong></div>
+    <div class="card-body">
+        {% if report.data.failed_cases %}
+        <ul class="list-group">
+            {% for case_name in report.data.failed_cases %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ case_name }}
+                <span class="badge bg-danger">失败</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-box">没有失败用例，全部通过</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-white"><strong>失败原因摘要</strong></div>
+    <div class="card-body">
+        {% if report.data.failure_details %}
+        {% for item in report.data.failure_details %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <strong>{{ item.testcase_name }}</strong>
+            </div>
+            <div class="card-body">
+                <p><strong>错误信息：</strong>{{ item.error_message or '无系统异常，属于断言失败' }}</p>
+                {% if item.failed_assertions %}
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                        <tr>
+                            <th>断言类型</th>
+                            <th>期望值</th>
+                            <th>实际值</th>
+                            <th>结果</th>
+                            <th>说明</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for assertion in item.failed_assertions %}
+                        <tr>
+                            <td>{{ assertion.type }}</td>
+                            <td>{{ assertion.expected }}</td>
+                            <td>{{ assertion.actual }}</td>
+                            <td><span class="badge bg-danger">失败</span></td>
+                            <td>{{ assertion.message }}</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-muted">无断言失败明细，通常为请求异常或变量异常。</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-box">当前报告没有失败原因摘要</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}AI 解析{% endblock %}
+{% block page_title %}AI 接口解析{% endblock %}
+{% block page_desc %}输入接口文档，生成标准 JSON 用例并可直接保存{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header bg-white"><strong>解析与保存配置</strong></div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Prompt 模板</label>
+                <select class="form-select" id="templateId">
+                    <option value="">默认启用模板</option>
+                    {% for item in templates %}
+                    <option value="{{ item.id }}">{{ item.name }}{% if item.is_active %}（启用）{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">目标项目</label>
+                <select class="form-select" id="projectId">
+                    <option value="">请选择项目</option>
+                    {% for project in projects %}
+                    <option value="{{ project.id }}">{{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">目标模块</label>
+                <select class="form-select" id="moduleId">
+                    <option value="">请选择模块</option>
+                    {% for module in modules %}
+                    <option value="{{ module.id }}">{{ module.project.name }} / {{ module.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">保存描述</label>
+                <input class="form-control" id="saveDescription" value="AI 解析生成">
+            </div>
+            <div class="col-12 d-flex gap-2 flex-wrap">
+                <button class="btn btn-primary" id="parseBtn" type="button">开始解析</button>
+                <button class="btn btn-outline-success" id="validateBtn" type="button">校验结果</button>
+                <button class="btn btn-success" id="saveBtn" type="button">保存为用例</button>
+                <button class="btn btn-outline-secondary" id="copyResultBtn" type="button">复制结果</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="split-pane">
+    <div class="card h-100">
+        <div class="card-header bg-white"><strong>接口文档输入</strong></div>
+        <div class="card-body">
+            <textarea class="form-control json-textarea-lg" id="documentText" placeholder="请输入接口文档，例如：
+接口名称：登录
+请求方式：POST
+请求地址：/api/login
+请求参数：username, password
+响应示例：{ &quot;code&quot;: 0, &quot;data&quot;: { &quot;token&quot;: &quot;abc&quot; } }"></textarea>
+        </div>
+    </div>
+
+    <div class="card h-100">
+        <div class="card-header bg-white"><strong>解析结果输出</strong></div>
+        <div class="card-body">
+            <div id="aiResult" class="result-box">解析结果将显示在这里</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function getAiResultText() {
+    return document.getElementById("aiResult").textContent || "";
+}
+
+async function parseAiDocument() {
+    const documentText = document.getElementById("documentText").value;
+    const templateId = document.getElementById("templateId").value || null;
+
+    const result = await postJson("{{ url_for('ai.parse_document') }}", {
+        document_text: documentText,
+        template_id: templateId
+    });
+
+    showResultText("aiResult", result.data.case_data);
+    return result.data.case_data;
+}
+
+document.getElementById("parseBtn").addEventListener("click", async function () {
+    try {
+        await parseAiDocument();
+    } catch (error) {
+        showResultText("aiResult", error.message);
+    }
+});
+
+document.getElementById("validateBtn").addEventListener("click", async function () {
+    try {
+        const caseData = getAiResultText();
+        const result = await postJson("{{ url_for('ai.validate_ai_result') }}", {
+            case_data: caseData
+        });
+        showResultText("aiResult", result.data);
+    } catch (error) {
+        showResultText("aiResult", error.message);
+    }
+});
+
+document.getElementById("saveBtn").addEventListener("click", async function () {
+    const projectId = document.getElementById("projectId").value;
+    const moduleId = document.getElementById("moduleId").value;
+    const description = document.getElementById("saveDescription").value;
+    const caseData = getAiResultText();
+
+    if (!projectId) {
+        showResultText("aiResult", "请先选择目标项目");
+        return;
+    }
+    if (!moduleId) {
+        showResultText("aiResult", "请先选择目标模块");
+        return;
+    }
+
+    try {
+        const result = await postJson("{{ url_for('ai.save_ai_testcase') }}", {
+            project_id: projectId,
+            module_id: moduleId,
+            case_data: caseData,
+            description: description
+        });
+        showResultText("aiResult", {
+            message: "保存成功",
+            testcase_id: result.data.testcase_id,
+            name: result.data.name
+        });
+    } catch (error) {
+        showResultText("aiResult", error.message);
+    }
+});
+
+document.getElementById("copyResultBtn").addEventListener("click", async function () {
+    const text = getAiResultText();
+    await navigator.clipboard.writeText(text);
+    alert("解析结果已复制");
+});
+</script>
+{% endblock %}

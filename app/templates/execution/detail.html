@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}执行详情{% endblock %}
+{% block page_title %}执行详情 #{{ execution.id }}{% endblock %}
+{% block page_desc %}查看请求快照、响应内容、断言结果和错误信息{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="text-muted">执行状态</div>
+                <div class="fs-4">
+                    {% if execution.status == 'passed' %}
+                    <span class="text-success">成功</span>
+                    {% elif execution.status == 'failed' %}
+                    <span class="text-danger">失败</span>
+                    {% else %}
+                    <span class="text-secondary">{{ execution.status }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body"><div class="text-muted">总用例数</div><div class="fs-4">{{ execution.total_count }}</div></div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body"><div class="text-muted">通过率</div><div class="fs-4">{{ execution.pass_rate }}%</div></div></div>
+    </div>
+    <div class="col-md-3">
+        <div class="card"><div class="card-body"><div class="text-muted">总耗时</div><div class="fs-4">{{ execution.total_duration_ms }} ms</div></div></div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-white"><strong>执行基本信息</strong></div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3"><strong>项目：</strong>{{ execution.project.name }}</div>
+            <div class="col-md-3"><strong>环境：</strong>{{ execution.environment.name if execution.environment else '-' }}</div>
+            <div class="col-md-3"><strong>类型：</strong>{{ execution.execution_type }}</div>
+            <div class="col-md-3">
+                <strong>目标：</strong>
+                {% if execution.target_type == 'selection' %}
+                selection / {{ execution.summary.get('selected_count', execution.total_count) }} 条
+                {% else %}
+                {{ execution.target_type }} / {{ execution.target_id }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white"><strong>执行明细</strong></div>
+    <div class="card-body">
+        {% if execution.details %}
+        {% for detail in execution.details %}
+        <div class="card mb-2 detail-item">
+            <button
+                class="card-header detail-toggle d-flex justify-content-between align-items-center w-100 border-0 bg-white"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#detailCollapse{{ detail.id }}"
+                aria-expanded="false"
+                aria-controls="detailCollapse{{ detail.id }}"
+            >
+                <span class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-semibold">{{ (detail.testcase.name if detail.testcase else detail.testcase_name)|clean_text('未命名用例') }}</span>
+                    <span class="badge text-bg-light border text-muted">项目：{{ execution.project.name|clean_text('未知项目') }}</span>
+                    <span class="badge text-bg-light border text-muted">模块：{{ detail.testcase.module.name|clean_text('未知模块') if detail.testcase and detail.testcase.module else '未知模块' }}</span>
+                    {% set req = detail.request_data %}
+                    {% set req_method = (req.get('method', '') if req else '') %}
+                    {% set req_path = (req.get('path') or req.get('url') or '-') if req else '-' %}
+                    <span class="badge text-bg-light border text-muted">接口：{{ (req_method ~ ' ' ~ req_path).strip() }}</span>
+                </span>
+                <span class="d-flex align-items-center gap-3">
+                    <span class="text-muted">耗时：{{ detail.duration_ms }} ms</span>
+                    {% if detail.status == 'passed' %}
+                    <span class="badge bg-success">通过</span>
+                    {% elif detail.status == 'failed' %}
+                    <span class="badge bg-danger">失败</span>
+                    {% else %}
+                    <span class="badge bg-secondary">{{ detail.status }}</span>
+                    {% endif %}
+                </span>
+            </button>
+            <div id="detailCollapse{{ detail.id }}" class="collapse">
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-12"><strong>错误信息：</strong>{{ detail.error_message|clean_text('-') if detail.error_message else '-' }}</div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">请求快照</label>
+                                <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="request">加载完整</button>
+                            </div>
+                            <div class="result-box detail-result-box" id="detailRequest{{ detail.id }}" style="min-height: 200px; height: 300px;">展开后按需加载请求快照...</div>
+                            <div class="form-text text-muted" id="detailRequestMeta{{ detail.id }}"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">响应快照</label>
+                                <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="response">加载完整</button>
+                            </div>
+                            <div class="result-box detail-result-box" id="detailResponse{{ detail.id }}" style="min-height: 200px; height: 300px;">展开后按需加载响应快照...</div>
+                            <div class="form-text text-muted" id="detailResponseMeta{{ detail.id }}"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">断言结果</label>
+                                <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="assertion">加载完整</button>
+                            </div>
+                            <div class="result-box detail-result-box" id="detailAssertion{{ detail.id }}" style="min-height: 150px; height: 150px;">展开后按需加载断言结果...</div>
+                            <div class="form-text text-muted" id="detailAssertionMeta{{ detail.id }}"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">提取变量</label>
+                                <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="extract">加载完整</button>
+                            </div>
+                            <div class="result-box detail-result-box" id="detailExtract{{ detail.id }}" style="min-height: 150px; height: 150px;">展开后按需加载提取变量...</div>
+                            <div class="form-text text-muted" id="detailExtractMeta{{ detail.id }}"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-box">当前执行记录暂无明细</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DETAIL_SECTION_LABELS = {
+    request: "请求快照",
+    response: "响应快照",
+    assertion: "断言结果",
+    extract: "提取变量"
+};
+
+const detailPreviewCache = new Map();
+const detailFullCache = new Map();
+
+function getDetailSectionElements(detailId, section) {
+    const prefix = section.charAt(0).toUpperCase() + section.slice(1);
+    return {
+        box: document.getElementById(`detail${prefix}${detailId}`),
+        meta: document.getElementById(`detail${prefix}Meta${detailId}`),
+        button: document.querySelector(`.detail-full-btn[data-detail-id="${detailId}"][data-section="${section}"]`)
+    };
+}
+
+function renderDetailSection(detailId, section, payload) {
+    const elements = getDetailSectionElements(detailId, section);
+    if (!elements.box || !elements.meta) return;
+
+    elements.box.textContent = payload.text || "(空)";
+    let metaText = `${DETAIL_SECTION_LABELS[section]}长度：${payload.length} 字符`;
+    if (payload.truncated) {
+        metaText += "，当前仅展示预览";
+    } else if (payload.full) {
+        metaText += "，已加载完整内容";
+    } else {
+        metaText += "，已完整展示";
+    }
+    elements.meta.textContent = metaText;
+
+    if (elements.button) {
+        elements.button.disabled = !payload.truncated || payload.full;
+        elements.button.textContent = payload.full ? "已加载完整" : "加载完整";
+    }
+}
+
+async function loadDetailPayload(detailId, section = "", full = false) {
+    const cacheKey = `${detailId}:${section || "all"}:${full ? "full" : "preview"}`;
+    const cache = full ? detailFullCache : detailPreviewCache;
+    if (cache.has(cacheKey)) {
+        return cache.get(cacheKey);
+    }
+
+    const params = new URLSearchParams();
+    if (section) params.set("section", section);
+    if (full) params.set("full", "1");
+
+    const response = await fetch(`/executions/api/details/${detailId}?${params.toString()}`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+        throw new Error(result.message || "加载执行明细失败");
+    }
+
+    cache.set(cacheKey, result.data);
+    return result.data;
+}
+
+async function loadDetailPreview(detailId) {
+    const collapse = document.getElementById(`detailCollapse${detailId}`);
+    if (collapse && collapse.dataset.loaded === "1") return;
+
+    const data = await loadDetailPayload(detailId);
+    Object.entries(data.sections || {}).forEach(([section, payload]) => {
+        renderDetailSection(detailId, section, payload);
+    });
+
+    if (collapse) collapse.dataset.loaded = "1";
+}
+
+async function loadDetailFull(detailId, section) {
+    const elements = getDetailSectionElements(detailId, section);
+    if (!elements.box) return;
+
+    elements.box.textContent = "正在加载完整内容...";
+    const data = await loadDetailPayload(detailId, section, true);
+    const payload = (data.sections || {})[section];
+    if (payload) renderDetailSection(detailId, section, payload);
+}
+
+document.querySelectorAll(".collapse[id^='detailCollapse']").forEach((collapseEl) => {
+    collapseEl.addEventListener("show.bs.collapse", async function () {
+        const detailId = this.id.replace("detailCollapse", "");
+        try {
+            await loadDetailPreview(detailId);
+        } catch (error) {
+            ["request", "response", "assertion", "extract"].forEach((section) => {
+                const elements = getDetailSectionElements(detailId, section);
+                if (elements.box) elements.box.textContent = `加载失败：${error.message}`;
+            });
+        }
+    });
+});
+
+document.querySelectorAll(".detail-full-btn").forEach((button) => {
+    button.addEventListener("click", async function () {
+        const detailId = this.dataset.detailId;
+        const section = this.dataset.section;
+        if (!detailId || !section || this.disabled) return;
+
+        const originalText = this.textContent;
+        this.disabled = true;
+        this.textContent = "加载中...";
+        try {
+            await loadDetailFull(detailId, section);
+        } catch (error) {
+            const elements = getDetailSectionElements(detailId, section);
+            if (elements.box) elements.box.textContent = `加载失败：${error.message}`;
+            this.disabled = false;
+            this.textContent = originalText;
+        }
+    });
+});
+</script>
+{% endblock %}

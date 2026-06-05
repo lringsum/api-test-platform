@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}测试报告{% endblock %}
+{% block page_title %}测试报告{% endblock %}
+{% block page_desc %}查看执行报告并按项目筛选{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>查询条件</strong>
+        <small class="text-muted">按当前项目筛选报告列表</small>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('report.list_reports') }}" class="d-flex flex-wrap align-items-center gap-3" id="reportFilterForm">
+            <div class="input-group" style="width: auto; min-width: 180px;">
+                <span class="input-group-text bg-light text-muted">状态</span>
+                <select class="form-select" name="status">
+                    <option value="">全部状态</option>
+                    <option value="passed" {% if selected_status == 'passed' %}selected{% endif %}>成功</option>
+                    <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>失败</option>
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit" id="reportQueryBtn"><i class="bi bi-search me-1"></i>查询</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('report.list_reports') }}" title="重置" id="reportClearBtn"><i class="bi bi-eraser"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="reportListContainer" class="report-list-container">
+    {% include "reports/_list_content.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+    const form = document.getElementById("reportFilterForm");
+    const listContainer = document.getElementById("reportListContainer");
+    const queryBtn = document.getElementById("reportQueryBtn");
+    const clearBtn = document.getElementById("reportClearBtn");
+    if (!form || !listContainer) return;
+
+    const baseUrl = form.getAttribute("action");
+
+    function setLoading(loading) {
+        listContainer.classList.toggle("is-loading", loading);
+        if (queryBtn) {
+            queryBtn.disabled = loading;
+            queryBtn.textContent = loading ? "查询中..." : "查询";
+        }
+    }
+
+    async function fetchList(url) {
+        setLoading(true);
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            });
+            if (!response.ok) {
+                throw new Error("请求失败");
+            }
+            const html = await response.text();
+            listContainer.innerHTML = html;
+            window.history.replaceState({}, "", url);
+        } catch (err) {
+            window.location.href = url;
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        const params = new URLSearchParams(new FormData(form));
+        const queryString = params.toString();
+        const targetUrl = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+        fetchList(targetUrl);
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener("click", function (event) {
+            event.preventDefault();
+            form.reset();
+            fetchList(baseUrl);
+        });
+    }
+
+    // 处理分页按钮点击，实现无刷新加载
+    listContainer.addEventListener("click", function (event) {
+        const link = event.target.closest(".page-link");
+        if (link && link.tagName === "A" && link.href) {
+            event.preventDefault();
+            fetchList(link.href);
+        }
+    });
+})();
+</script>
+{% endblock %}

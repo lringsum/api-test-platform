@@ -1,0 +1,30 @@
+# Local development environment
+.venv/
+venv/
+env/
+
+# Editor / IDE files
+.idea/
+.vscode/
+.dbg/
+.trae/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Local temp and build artifacts
+tmp/
+.pytest_cache/
+.mypy_cache/
+dist/
+build/
+
+# Local data / demo seed files
+instance/
+seed_data.py
+
+# Environment files
+.env
+.env.*
+

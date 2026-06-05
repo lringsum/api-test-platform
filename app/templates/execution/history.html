@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}执行历史{% endblock %}
+{% block page_title %}执行历史{% endblock %}
+{% block page_desc %}查看历史执行批次与报告入口{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>查询条件</strong>
+        <small class="text-muted">按当前项目查询执行历史</small>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('execution.history_page') }}" class="d-flex flex-wrap align-items-center gap-3">
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('execution.history_page') }}" title="重置"><i class="bi bi-eraser"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white"><strong>执行记录</strong></div>
+    <div class="card-body">
+        {% if pagination.items %}
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>项目</th>
+                    <th>环境</th>
+                    <th>执行时间</th>
+                    <th>执行类型</th>
+                    <th>目标类型</th>
+                    <th>状态</th>
+                    <th>总数</th>
+                    <th>通过</th>
+                    <th>失败</th>
+                    <th>通过率</th>
+                    <th>平均耗时(ms)</th>
+                    <th width="180">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in pagination.items %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.project.name }}</td>
+                    <td>{{ item.environment.name if item.environment else '-' }}</td>
+                    <td>{{ (item.started_at or item.created_at) | bjt }}</td>
+                    <td>{{ item.execution_type }}</td>
+                    <td>
+                        {% if item.target_type == 'selection' %}
+                        选中用例
+                        {% else %}
+                        {{ item.target_type }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.status == 'passed' %}
+                        <span class="badge bg-success">成功</span>
+                        {% elif item.status == 'failed' %}
+                        <span class="badge bg-danger">失败</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ item.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.total_count }}</td>
+                    <td>{{ item.passed_count }}</td>
+                    <td>{{ item.failed_count }}</td>
+                    <td>{{ item.pass_rate }}%</td>
+                    <td>
+                        <div>{{ '%.2f'|format((item.total_duration_ms / item.total_count) if item.total_count > 0 else 0) }}</div>
+                        <small class="text-muted">总时：{{ item.total_duration_ms }} ms</small>
+                    </td>
+                    <td class="d-flex gap-2">
+                        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('execution.detail_page', execution_id=item.id) }}"><i class="bi bi-file-text me-1"></i>详情</a>
+                        {% if item.report %}
+                        <a class="btn btn-sm btn-outline-success" href="{{ url_for('report.detail_report', report_id=item.report.id) }}"><i class="bi bi-bar-chart-fill me-1"></i>报告</a>
+                        {% else %}
+                        <span class="btn btn-sm btn-secondary disabled"><i class="bi bi-slash-circle me-1"></i>无报告</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if pagination.pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('execution.history_page', page=pagination.prev_num, project_id=request.args.get('project_id')) }}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+                
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        {% if pagination.page == page_num %}
+                            <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                        {% else %}
+                            <li class="page-item"><a class="page-link" href="{{ url_for('execution.history_page', page=page_num, project_id=request.args.get('project_id')) }}">{{ page_num }}</a></li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('execution.history_page', page=pagination.next_num, project_id=request.args.get('project_id')) }}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-box">暂无执行历史</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

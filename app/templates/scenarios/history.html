@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}场景执行历史{% endblock %}
+{% block page_title %}场景执行历史{% endblock %}
+{% block page_desc %}查看联动场景的执行记录与结果{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>查询条件</strong>
+        <small class="text-muted">按当前项目、场景、环境和状态过滤执行记录</small>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('scenario.scenario_execution_history') }}" class="d-flex flex-wrap align-items-center gap-3">
+            <div class="input-group" style="width: auto; min-width: 180px;">
+                <span class="input-group-text bg-light text-muted">场景</span>
+                <select class="form-select" name="scenario_id">
+                    <option value="">全部场景</option>
+                    {% for item in scenarios %}
+                    <option value="{{ item.id }}" {% if selected_scenario_id == item.id %}selected{% endif %}>{{ item.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="input-group" style="width: auto; min-width: 180px;">
+                <span class="input-group-text bg-light text-muted">环境</span>
+                <select class="form-select" name="environment_id">
+                    <option value="">全部环境</option>
+                    {% for env in environments %}
+                    <option value="{{ env.id }}" {% if selected_environment_id == env.id %}selected{% endif %}>{{ env.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="input-group" style="width: auto; min-width: 160px;">
+                <span class="input-group-text bg-light text-muted">状态</span>
+                <select class="form-select" name="status">
+                    <option value="">全部状态</option>
+                    <option value="passed" {% if selected_status == 'passed' %}selected{% endif %}>成功</option>
+                    <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>失败</option>
+                    <option value="partial_success" {% if selected_status == 'partial_success' %}selected{% endif %}>部分成功</option>
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('scenario.scenario_execution_history') }}" title="重置"><i class="bi bi-eraser"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white"><strong>执行记录</strong></div>
+    <div class="card-body">
+        {% if pagination.items %}
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>场景名称</th>
+                    <th>项目</th>
+                    <th>环境</th>
+                    <th>状态</th>
+                    <th>总步骤</th>
+                    <th>通过</th>
+                    <th>失败</th>
+                    <th>总耗时(ms)</th>
+                    <th>执行时间</th>
+                    <th width="180">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in pagination.items %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.scenario.name }}</td>
+                    <td>{{ item.scenario.project.name }}</td>
+                    <td>{{ item.environment.name if item.environment else '-' }}</td>
+                    <td>
+                        {% if item.status == 'passed' %}
+                        <span class="badge bg-success">成功</span>
+                        {% elif item.status == 'partial_success' %}
+                        <span class="badge bg-warning text-dark">部分成功</span>
+                        {% elif item.status == 'failed' %}
+                        <span class="badge bg-danger">失败</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ item.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.total_steps }}</td>
+                    <td>{{ item.passed_steps }}</td>
+                    <td>{{ item.failed_steps }}</td>
+                    <td>{{ item.duration_ms }}</td>
+                    <td>{{ (item.started_at or item.created_at) | bjt }}</td>
+                    <td class="d-flex gap-2">
+                        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('scenario.scenario_execution_detail', scenario_execution_id=item.id) }}"><i class="bi bi-file-text me-1"></i>详情</a>
+                        <form method="post" action="{{ url_for('scenario.rerun_scenario_execution', scenario_execution_id=item.id) }}">
+                            <input type="hidden" name="persist_extracted_to_environment" value="0">
+                            <button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-play-fill me-1"></i>重跑</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if pagination.pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('scenario.scenario_execution_history', page=pagination.prev_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+                
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        {% if pagination.page == page_num %}
+                            <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                        {% else %}
+                            <li class="page-item"><a class="page-link" href="{{ url_for('scenario.scenario_execution_history', page=page_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}">{{ page_num }}</a></li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('scenario.scenario_execution_history', page=pagination.next_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-box">暂无场景执行历史</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

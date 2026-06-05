@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}模块管理{% endblock %}
+{% block page_title %}模块管理{% endblock %}
+{% block page_desc %}按项目维护接口模块分组{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>查询条件</strong>
+        <small class="text-muted">按当前项目查询模块列表</small>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('module.list_modules') }}" class="d-flex flex-wrap align-items-center gap-3">
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('module.list_modules') }}" title="重置"><i class="bi bi-eraser"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mb-4 page-action-panel">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
+        <strong>新增模块</strong>
+        <button class="btn btn-sm btn-outline-primary page-action-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#createModulePanel" aria-expanded="false" aria-controls="createModulePanel" title="展开新增" aria-label="展开新增">
+            <i class="bi bi-chevron-down"></i>
+        </button>
+    </div>
+    <div class="collapse" id="createModulePanel">
+        <div class="card-body page-action-panel-body">
+            <form method="post" action="{{ url_for('module.create_module') }}">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">所属项目</label>
+                        <select class="form-select" name="project_id">
+                            {% for project in projects %}
+                            <option value="{{ project.id }}">{{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">模块名称</label>
+                        <input class="form-control" name="name" placeholder="如：登录模块">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">描述</label>
+                        <input class="form-control" name="description" placeholder="请输入模块描述">
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>新增模块</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white"><strong>模块列表</strong></div>
+    <div class="card-body">
+        {% if modules %}
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>模块名称</th>
+                    <th>所属项目</th>
+                    <th>描述</th>
+                    <th>创建时间</th>
+                    <th width="260">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in modules %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.project.name }}</td>
+                    <td>{{ item.description }}</td>
+                    <td>{{ item.created_at | bjt }}</td>
+                    <td>
+                        <div class="d-flex gap-2 mb-2">
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editModule{{ item.id }}">
+                                <i class="bi bi-pencil-square me-1"></i>编辑
+                            </button>
+                            <form method="post" action="{{ url_for('module.delete_module', module_id=item.id) }}" onsubmit="return confirm('确认删除该模块吗？将同时删除模块下的用例！');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>删除</button>
+                            </form>
+                        </div>
+                        <div class="collapse" id="editModule{{ item.id }}">
+                            <div class="card card-body bg-light">
+                                <form method="post" action="{{ url_for('module.edit_module', module_id=item.id) }}" class="row g-2">
+                                    <div class="col-md-5">
+                                        <label class="form-label">模块名称</label>
+                                        <input class="form-control form-control-sm" name="name" value="{{ item.name }}">
+                                    </div>
+                                    <div class="col-md-7">
+                                        <label class="form-label">模块描述</label>
+                                        <input class="form-control form-control-sm" name="description" value="{{ item.description }}">
+                                    </div>
+                                    <div class="col-12 d-flex justify-content-end">
+                                        <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check-lg me-1"></i>保存修改</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-box">暂无模块数据</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

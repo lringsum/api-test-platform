@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}场景管理{% endblock %}
+{% block page_title %}场景管理{% endblock %}
+{% block page_desc %}维护多接口联动场景，用于链路回归测试{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>查询条件</strong>
+        <small class="text-muted">按当前项目、模块、状态快速查询场景</small>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{{ url_for('scenario.list_scenarios') }}" class="d-flex flex-wrap align-items-center gap-3">
+            <div class="input-group" style="width: auto; min-width: 180px;">
+                <span class="input-group-text bg-light text-muted">模块</span>
+                <select class="form-select" name="module_id">
+                    <option value="">全部模块</option>
+                    {% for module in modules %}
+                    <option value="{{ module.id }}" {% if selected_module_id == module.id %}selected{% endif %}>{{ module.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="input-group" style="width: auto; min-width: 140px;">
+                <span class="input-group-text bg-light text-muted">状态</span>
+                <select class="form-select" name="status">
+                    <option value="">全部</option>
+                    <option value="active" {% if selected_status == 'active' %}selected{% endif %}>启用</option>
+                    <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>停用</option>
+                </select>
+            </div>
+            <div class="input-group" style="width: auto; min-width: 200px;">
+                <span class="input-group-text bg-light text-muted">名称</span>
+                <input class="form-control" name="keyword" value="{{ keyword }}" placeholder="关键词">
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('scenario.list_scenarios') }}" title="重置"><i class="bi bi-eraser"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mb-4 page-action-panel">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
+        <strong>新增场景</strong>
+        <button class="btn btn-sm btn-outline-primary page-action-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#createScenarioPanel" aria-expanded="false" aria-controls="createScenarioPanel" title="展开新增" aria-label="展开新增">
+            <i class="bi bi-chevron-down"></i>
+        </button>
+    </div>
+    <div class="collapse" id="createScenarioPanel">
+        <div class="card-body page-action-panel-body">
+            <form method="post" action="{{ url_for('scenario.create_scenario') }}">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">所属项目</label>
+                        <select class="form-select" name="project_id" required>
+                            {% for project in projects %}
+                            <option value="{{ project.id }}">{{ project.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">所属模块</label>
+                        <select class="form-select" name="module_id">
+                            <option value="">无</option>
+                            {% for module in all_modules %}
+                            <option value="{{ module.id }}">{{ module.project.name }} / {{ module.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">场景名称</label>
+                        <input class="form-control" name="name" placeholder="如：初始化后登录校验" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">状态</label>
+                        <select class="form-select" name="status">
+                            <option value="active">启用</option>
+                            <option value="inactive">停用</option>
+                        </select>
+                    </div>
+                    <div class="col-md-9">
+                        <label class="form-label">场景描述</label>
+                        <input class="form-control" name="description" placeholder="请输入场景用途说明">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">标签</label>
+                        <input class="form-control" name="tags_text" placeholder="多个标签用逗号分隔">
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>新增场景</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white"><strong>场景列表</strong></div>
+    <div class="card-body">
+        {% if scenarios %}
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>场景名称</th>
+                    <th>项目</th>
+                    <th>模块</th>
+                    <th>步骤数</th>
+                    <th>状态</th>
+                    <th>标签</th>
+                    <th>更新时间</th>
+                    <th width="320">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in scenarios %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.project.name }}</td>
+                    <td>{{ item.module.name if item.module else '-' }}</td>
+                    <td>{{ item.steps|length }}</td>
+                    <td>
+                        {% if item.status == 'active' %}
+                        <span class="badge bg-success">启用</span>
+                        {% else %}
+                        <span class="badge bg-secondary">停用</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.tags %}
+                            {{ item.tags | join(', ') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ item.updated_at | bjt }}</td>
+                    <td>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#runScenario{{ item.id }}">
+                                <i class="bi bi-play-fill me-1"></i>快捷执行
+                            </button>
+                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('scenario.edit_scenario_page', scenario_id=item.id) }}"><i class="bi bi-gear me-1"></i>配置</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('scenario.scenario_execution_history', scenario_id=item.id) }}"><i class="bi bi-clock-history me-1"></i>记录</a>
+                            <form method="post" action="{{ url_for('scenario.delete_scenario', scenario_id=item.id) }}" onsubmit="return confirm('确认删除该场景吗？');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>删除</button>
+                            </form>
+                        </div>
+                        <div class="collapse" id="runScenario{{ item.id }}">
+                            <div class="card card-body bg-light">
+                                <form method="post" action="{{ url_for('scenario.run_scenario', scenario_id=item.id) }}" class="row g-2">
+                                    <input type="hidden" name="back_to" value="list">
+                                    <div class="col-md-6">
+                                        <label class="form-label">执行环境</label>
+                                        <select class="form-select form-select-sm" name="environment_id" required>
+                                            <option value="">请选择环境</option>
+                                            {% for env in all_environments %}
+                                            {% if env.project_id == item.project_id %}
+                                            <option value="{{ env.id }}">{{ env.name }}</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">变量同步</label>
+                                        <select class="form-select form-select-sm" name="persist_extracted_to_environment">
+                                            <option value="0">仅本次场景内传递</option>
+                                            <option value="1">同步写入环境变量</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 d-flex justify-content-end">
+                                        <button class="btn btn-sm btn-primary" type="submit">开始执行</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-box">暂无场景，请先新增一个联动测试场景</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
