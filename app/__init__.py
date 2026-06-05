@@ -41,9 +41,13 @@ def register_blueprints(app):
 
 def create_app():
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if os.environ.get("VERCEL"):
+        instance_path = os.path.join("/tmp", "api-test-platform-instance")
+    else:
+        instance_path = os.path.join(project_root, "instance")
     app = Flask(
         __name__,
-        instance_relative_config=True,
+        instance_path=instance_path,
         static_folder=os.path.join(project_root, "public"),
         static_url_path="",
     )
