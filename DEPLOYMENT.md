@@ -7,7 +7,6 @@ This project is now organized for a clean GitHub push and a straightforward Verc
 - `.gitignore` to keep local artifacts out of Git.
 - `.vercelignore` to keep local-only files out of Vercel uploads.
 - `api/index.py` as the Vercel-friendly Flask entry point.
-- `vercel.json` with a longer function timeout for this app.
 - `public/` for CSS and JS so Vercel can serve static assets cleanly.
 
 ## Push to GitHub
@@ -51,3 +50,8 @@ from app import create_app
 
 app = create_app()
 ```
+
+## Notes
+
+- This project does not need a custom `vercel.json` for the default Flask deployment path.
+- Let Vercel detect the Python app automatically from `api/index.py`.
