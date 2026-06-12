@@ -3,9 +3,18 @@
 {% block title %}场景管理{% endblock %}
 {% block page_title %}场景管理{% endblock %}
 {% block page_desc %}维护多接口联动场景，用于回归测试{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
 {% block content %}
-<div class="card mb-3">
+<div class="api-workspace-page">
+<div class="api-workspace-header">
+    <div><span class="page-eyebrow">WORKFLOW ORCHESTRATION</span><h2>场景管理</h2><p>编排多接口联动测试流程，沉淀稳定可靠的回归场景。</p></div>
+    {% if has_permission('scenario:create') %}
+    <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#createScenarioPanel"><i class="bi bi-plus-lg"></i>新增场景</button>
+    {% endif %}
+</div>
+<div class="card mb-3 api-filter-card">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <strong>查询条件</strong>
         <small class="text-muted">按当前项目、模块、状态快速查询场景</small>
@@ -42,13 +51,7 @@
 </div>
 
 {% if has_permission('scenario:create') %}
-<div class="card mb-4 page-action-panel">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
-        <strong>新增场景</strong>
-        <button class="btn btn-sm btn-outline-primary page-action-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#createScenarioPanel" aria-expanded="false" aria-controls="createScenarioPanel" title="展开新增" aria-label="展开新增">
-            <i class="bi bi-chevron-down"></i>
-        </button>
-    </div>
+<div class="card mb-3 page-action-panel api-create-panel">
     <div class="collapse" id="createScenarioPanel">
         <div class="card-body page-action-panel-body">
             <form method="post" action="{{ url_for('scenario.create_scenario') }}">
@@ -99,12 +102,12 @@
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card api-list-card">
     <div class="card-header bg-white"><strong>场景列表</strong></div>
     <div class="card-body">
         {% if scenarios %}
         <div class="table-responsive">
-            <table class="table table-hover table-bordered">
+            <table class="table table-hover">
                 <thead>
                 <tr>
                     <th>ID</th>
@@ -194,5 +197,6 @@
         <div class="empty-box">暂无场景，请先新建一个联动测试场景</div>
         {% endif %}
     </div>
+</div>
 </div>
 {% endblock %}

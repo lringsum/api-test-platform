@@ -24,7 +24,7 @@ PAGE_REGISTRY = [
         module="project",
         path="/projects/",
         page_title="项目管理",
-        ready_markers=("查询条件",),
+        ready_markers=("项目工作台", "项目列表", "快捷入口"),
     ),
     PageSpec(
         name="modules",
@@ -128,6 +128,16 @@ PAGE_REGISTRY = [
 
 
 BROWSER_SCENARIOS = [
+    {
+        "name": "project_management_smoke",
+        "module": "project",
+        "kind": "smoke",
+    },
+    {
+        "name": "project_management_empty",
+        "module": "project",
+        "kind": "anomaly",
+    },
     {
         "name": "execution_smoke",
         "module": "execution",

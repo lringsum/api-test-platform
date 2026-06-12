@@ -53,6 +53,49 @@ def get_latest_execution_with_report():
         return execution.id if execution else None, report.id
 
 
+def run_project_management_smoke(session, scenario):
+    response = session.get(f"{BASE_URL}/projects/", timeout=10)
+    response.raise_for_status()
+    html = response.text
+    missing = [
+        marker
+        for marker in (
+            "项目工作台",
+            "project-filter-form",
+            "project-list-card",
+            "projectSideToggle",
+            "projectSidePanel",
+            "createProjectDrawer",
+            "快捷入口",
+        )
+        if marker not in html
+    ]
+    return {
+        "name": scenario["name"],
+        "module": scenario["module"],
+        "kind": scenario["kind"],
+        "status": "PASS" if not missing else "FAIL",
+        "missing": missing,
+    }
+
+
+def run_project_management_empty(session, scenario):
+    response = session.get(
+        f"{BASE_URL}/projects/",
+        params={"keyword": f"gate-empty-{uuid.uuid4().hex}"},
+        timeout=10,
+    )
+    response.raise_for_status()
+    missing = [] if "暂时没有匹配的项目" in response.text else ["project_empty_state"]
+    return {
+        "name": scenario["name"],
+        "module": scenario["module"],
+        "kind": scenario["kind"],
+        "status": "PASS" if not missing else "FAIL",
+        "missing": missing,
+    }
+
+
 def run_execution_smoke(session, scenario):
     project_id = scenario["project_id"]
     page_response = session.get(f"{BASE_URL}/executions/run?project_id={project_id}", timeout=10)
@@ -1192,6 +1235,10 @@ def run_ui_script_batch_smoke(session, scenario):
 
 
 def run_scenario(session, scenario):
+    if scenario["name"] == "project_management_smoke":
+        return run_project_management_smoke(session, scenario)
+    if scenario["name"] == "project_management_empty":
+        return run_project_management_empty(session, scenario)
     if scenario["name"] == "execution_smoke":
         return run_execution_smoke(session, scenario)
     if scenario["name"] == "execution_anomaly_empty":

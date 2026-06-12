@@ -29,3 +29,13 @@ async function postJson(url, payload) {
     }
     return data;
 }
+
+document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        const globalSearch = document.getElementById("globalSearch");
+        if (!globalSearch) return;
+        event.preventDefault();
+        globalSearch.focus();
+        globalSearch.select();
+    }
+});

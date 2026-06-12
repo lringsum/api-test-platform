@@ -59,8 +59,11 @@
 <div class="app-shell">
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <h4 class="mb-0">API 测试平台</h4>
-            <small class="text-light-emphasis">Flask + Bootstrap 5</small>
+            <div class="sidebar-brand-mark"><i class="bi bi-triangle-fill"></i></div>
+            <div class="sidebar-brand-copy">
+                <h4 class="mb-0">API 测试平台</h4>
+                <small>Flask + Bootstrap 5</small>
+            </div>
         </div>
 
         {% if current_user and has_permission('project:view') %}
@@ -95,11 +98,11 @@
             {% if has_permission('dashboard:view') %}
             <div class="nav-group">
                 <button class="nav-link nav-group-toggle {% if overview_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupOverview" aria-expanded="{{ 'true' if overview_active else 'false' }}">
-                    总览
+                    <span class="nav-label"><i class="bi bi-house-door"></i>总览</span>
                 </button>
                 <div class="collapse {% if overview_active %}show{% endif %}" id="groupOverview">
                     <div class="nav flex-column nav-group-menu">
-                        <a class="nav-link nav-sublink {% if request.path == '/' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">仪表盘</a>
+                        <a class="nav-link nav-sublink {% if request.path == '/' %}active{% endif %}" href="{{ url_for('dashboard.index') }}"><i class="bi bi-grid-1x2"></i>仪表盘</a>
                     </div>
                 </div>
             </div>
@@ -108,27 +111,27 @@
             {% if has_permission('project:view') or has_permission('module:view') or has_permission('environment:view') or has_permission('variable:view') or has_permission('testcase:view') or has_permission('scenario:view') %}
             <div class="nav-group">
                 <button class="nav-link nav-group-toggle {% if api_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupApi" aria-expanded="{{ 'true' if api_active else 'false' }}">
-                    API 测试
+                    <span class="nav-label"><i class="bi bi-code-slash"></i>API 测试</span>
                 </button>
                 <div class="collapse {% if api_active %}show{% endif %}" id="groupApi">
                     <div class="nav flex-column nav-group-menu">
                         {% if has_permission('project:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/projects') %}active{% endif %}" href="{{ url_for('project.list_projects') }}">项目管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/projects') %}active{% endif %}" href="{{ url_for('project.list_projects') }}"><i class="bi bi-folder2-open"></i>项目管理</a>
                         {% endif %}
                         {% if has_permission('module:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/modules') %}active{% endif %}" href="{{ url_for('module.list_modules') }}">模块管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/modules') %}active{% endif %}" href="{{ url_for('module.list_modules') }}"><i class="bi bi-diagram-3"></i>模块管理</a>
                         {% endif %}
                         {% if has_permission('environment:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/environments') %}active{% endif %}" href="{{ url_for('environment.list_environments') }}">环境管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/environments') %}active{% endif %}" href="{{ url_for('environment.list_environments') }}"><i class="bi bi-sliders"></i>环境管理</a>
                         {% endif %}
                         {% if has_permission('variable:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/variables') %}active{% endif %}" href="{{ url_for('variable.list_variables') }}">变量管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/variables') %}active{% endif %}" href="{{ url_for('variable.list_variables') }}"><i class="bi bi-braces"></i>变量管理</a>
                         {% endif %}
                         {% if has_permission('testcase:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/testcases') %}active{% endif %}" href="{{ url_for('testcase.list_testcases') }}">用例管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/testcases') %}active{% endif %}" href="{{ url_for('testcase.list_testcases') }}"><i class="bi bi-card-checklist"></i>用例管理</a>
                         {% endif %}
                         {% if has_permission('scenario:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/scenarios') %}active{% endif %}" href="{{ url_for('scenario.list_scenarios') }}">场景管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/scenarios') %}active{% endif %}" href="{{ url_for('scenario.list_scenarios') }}"><i class="bi bi-bezier2"></i>场景管理</a>
                         {% endif %}
                     </div>
                 </div>
@@ -138,19 +141,19 @@
             {% if has_permission('uiauto:view') or has_permission('uiauto:script:view') or has_permission('uiauto:locator:view') %}
             <div class="nav-group">
                 <button class="nav-link nav-group-toggle {% if ui_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupUiAuto" aria-expanded="{{ 'true' if ui_active else 'false' }}">
-                    UI 自动化
+                    <span class="nav-label"><i class="bi bi-display"></i>UI 自动化</span>
                 </button>
                 <div class="collapse {% if ui_active %}show{% endif %}" id="groupUiAuto">
                     <div class="nav flex-column nav-group-menu">
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation') %}active{% endif %}" href="{{ url_for('ui_auto.index') }}">自动化总览</a>
+                        <a class="nav-link nav-sublink {% if request.path == '/ui-automation/' or request.path == '/ui-automation' %}active{% endif %}" href="{{ url_for('ui_auto.index') }}"><i class="bi bi-speedometer2"></i>自动化总览</a>
                         {% if has_permission('uiauto:script:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/scripts') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='scripts') }}">脚本管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/scripts') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='scripts') }}"><i class="bi bi-file-earmark-code"></i>脚本管理</a>
                         {% endif %}
                         {% if has_permission('uiauto:locator:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/locators') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='locators') }}">定位器库</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/locators') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='locators') }}"><i class="bi bi-crosshair"></i>定位器库</a>
                         {% endif %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/executions') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='executions') }}">执行计划</a>
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/replays') %}active{% endif %}" href="{{ url_for('ui_auto.replays_page') }}">报告回放</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/executions') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='executions') }}"><i class="bi bi-play-circle"></i>执行计划</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/replays') %}active{% endif %}" href="{{ url_for('ui_auto.replays_page') }}"><i class="bi bi-camera-reels"></i>报告回放</a>
                     </div>
                 </div>
             </div>
@@ -159,15 +162,15 @@
             {% if has_permission('ai:use') or has_permission('prompt:view') %}
             <div class="nav-group">
                 <button class="nav-link nav-group-toggle {% if assist_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupAssist" aria-expanded="{{ 'true' if assist_active else 'false' }}">
-                    智能辅助
+                    <span class="nav-label"><i class="bi bi-stars"></i>智能辅助</span>
                 </button>
                 <div class="collapse {% if assist_active %}show{% endif %}" id="groupAssist">
                     <div class="nav flex-column nav-group-menu">
                         {% if has_permission('ai:use') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/ai') %}active{% endif %}" href="{{ url_for('ai.parser_page') }}">AI 解析</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ai') %}active{% endif %}" href="{{ url_for('ai.parser_page') }}"><i class="bi bi-magic"></i>AI 解析</a>
                         {% endif %}
                         {% if has_permission('prompt:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/prompts') %}active{% endif %}" href="{{ url_for('prompt.list_prompts') }}">Prompt 模板</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/prompts') %}active{% endif %}" href="{{ url_for('prompt.list_prompts') }}"><i class="bi bi-chat-square-text"></i>Prompt 模板</a>
                         {% endif %}
                     </div>
                 </div>
@@ -177,15 +180,15 @@
             {% if has_permission('execution:view') or has_permission('report:view') %}
             <div class="nav-group">
                 <button class="nav-link nav-group-toggle {% if report_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupReport" aria-expanded="{{ 'true' if report_active else 'false' }}">
-                    执行与报告
+                    <span class="nav-label"><i class="bi bi-bar-chart-line"></i>执行与报告</span>
                 </button>
                 <div class="collapse {% if report_active %}show{% endif %}" id="groupReport">
                     <div class="nav flex-column nav-group-menu">
                         {% if has_permission('execution:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/executions/history') or (request.path.startswith('/executions/') and not request.path.startswith('/executions/run')) %}active{% endif %}" href="{{ url_for('execution.history_page') }}">执行历史</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/executions/history') or (request.path.startswith('/executions/') and not request.path.startswith('/executions/run')) %}active{% endif %}" href="{{ url_for('execution.history_page') }}"><i class="bi bi-clock-history"></i>执行历史</a>
                         {% endif %}
                         {% if has_permission('report:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/reports') %}active{% endif %}" href="{{ url_for('report.list_reports') }}">测试报告</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/reports') %}active{% endif %}" href="{{ url_for('report.list_reports') }}"><i class="bi bi-file-earmark-bar-graph"></i>测试报告</a>
                         {% endif %}
                     </div>
                 </div>
@@ -195,21 +198,21 @@
             {% if has_permission('user:manage') or has_permission('role:manage') or has_permission('project_member:manage') or has_permission('audit:view') %}
             <div class="nav-group">
                 <button class="nav-link nav-group-toggle {% if admin_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupAdmin" aria-expanded="{{ 'true' if admin_active else 'false' }}">
-                    权限管理
+                    <span class="nav-label"><i class="bi bi-people"></i>权限管理</span>
                 </button>
                 <div class="collapse {% if admin_active %}show{% endif %}" id="groupAdmin">
                     <div class="nav flex-column nav-group-menu">
                         {% if has_permission('user:manage') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/users') %}active{% endif %}" href="{{ url_for('admin.users_page') }}">用户管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/users') %}active{% endif %}" href="{{ url_for('admin.users_page') }}"><i class="bi bi-person"></i>用户管理</a>
                         {% endif %}
                         {% if has_permission('role:manage') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/roles') %}active{% endif %}" href="{{ url_for('admin.roles_page') }}">角色管理</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/roles') %}active{% endif %}" href="{{ url_for('admin.roles_page') }}"><i class="bi bi-person-badge"></i>角色管理</a>
                         {% endif %}
                         {% if has_permission('project_member:manage') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/projects') %}active{% endif %}" href="{{ url_for('admin.projects_page') }}">项目成员</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/projects') %}active{% endif %}" href="{{ url_for('admin.projects_page') }}"><i class="bi bi-person-workspace"></i>项目成员</a>
                         {% endif %}
                         {% if has_permission('audit:view') %}
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/audit') %}active{% endif %}" href="{{ url_for('admin.audit_page') }}">审计日志</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/audit') %}active{% endif %}" href="{{ url_for('admin.audit_page') }}"><i class="bi bi-shield-check"></i>审计日志</a>
                         {% endif %}
                     </div>
                 </div>
@@ -219,22 +222,44 @@
     </aside>
 
     <main class="main-content">
-        <header class="topbar d-flex justify-content-between align-items-center gap-3 flex-wrap">
-            <div>
+        <header class="topbar {% block topbar_class %}{% endblock %}">
+            {% block topbar_page %}
+            <div class="topbar-page">
                 <h5 class="mb-0">{% block page_title %}后台管理{% endblock %}</h5>
                 <small class="text-muted">{% block page_desc %}接口自动化测试平台{% endblock %}</small>
             </div>
-            <div class="d-flex gap-2 align-items-center">
+            {% endblock %}
+            <label class="topbar-search" for="globalSearch">
+                <i class="bi bi-search"></i>
+                <input id="globalSearch" type="search" placeholder="全局搜索（Ctrl + K）" autocomplete="off">
+                <kbd>Ctrl K</kbd>
+            </label>
+            <div class="topbar-actions">
                 {% if has_permission('testcase:create') %}
-                <a href="{{ url_for('testcase.create_testcase_page') }}" class="btn btn-sm btn-primary">新建用例</a>
+                <a href="{{ url_for('testcase.create_testcase_page') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i>新建用例</a>
                 {% endif %}
                 {% if has_permission('ai:use') %}
-                <a href="{{ url_for('ai.parser_page') }}" class="btn btn-sm btn-outline-primary">AI 解析</a>
+                <a href="{{ url_for('ai.parser_page') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-stars"></i>AI 解析</a>
                 {% endif %}
                 {% if current_user %}
-                <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">退出登录</button>
-                </form>
+                <button class="topbar-icon-btn" type="button" title="通知" aria-label="通知"><i class="bi bi-bell"></i><span class="topbar-notice-dot"></span></button>
+                <div class="dropdown">
+                    <button class="topbar-user" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="topbar-avatar">{{ (current_user.display_name or current_user.username or 'U')[:1] }}</span>
+                        <span class="topbar-user-copy">
+                            <strong>{{ current_user.display_name or current_user.username }}</strong>
+                            <small>{{ '管理员' if current_user.is_superuser else '平台用户' }}</small>
+                        </span>
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end topbar-user-menu">
+                        <div class="px-3 py-2 text-muted small">{{ current_user.username }}</div>
+                        <div class="dropdown-divider"></div>
+                        <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+                            <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>退出登录</button>
+                        </form>
+                    </div>
+                </div>
                 {% endif %}
             </div>
         </header>

@@ -3,9 +3,18 @@
 {% block title %}用例管理{% endblock %}
 {% block page_title %}用例管理{% endblock %}
 {% block page_desc %}查看、筛选和维护接口测试用例{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
 {% block content %}
-<div class="card testcase-search-panel mb-4">
+<div class="api-workspace-page testcase-workspace-page">
+<div class="api-workspace-header">
+    <div><span class="page-eyebrow">TEST CASE WORKBENCH</span><h2>用例管理</h2><p>按模块和接口组织测试用例，快速完成维护、执行与回归。</p></div>
+    {% if has_permission('testcase:create') %}
+    <a class="btn btn-primary" href="{{ url_for('testcase.create_testcase_page') }}"><i class="bi bi-plus-lg"></i>新增用例</a>
+    {% endif %}
+</div>
+<div class="card testcase-search-panel mb-3 api-filter-card">
     <div class="card-header bg-white d-flex justify-content-between align-items-center testcase-panel-header">
         <strong class="testcase-section-title">查询条件</strong>
         <small class="testcase-section-desc">按当前项目与模块快速定位用例</small>
@@ -161,6 +170,7 @@
             </div>
         </div>
     </section>
+</div>
 </div>
 {% endblock %}
 
