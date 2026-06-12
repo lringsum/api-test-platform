@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}UI 自动化总览{% endblock %}
+{% block page_title %}UI 自动化总览{% endblock %}
+{% block page_desc %}统一承载脚本、定位器、执行与回放能力，后续会逐步接入 AI 生成与修复。{% endblock %}
+
+{% block head %}
+<style>
+    .timeline-list {
+        display: grid;
+        gap: 14px;
+    }
+
+    .timeline-item {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 14px 16px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .timeline-dot {
+        width: 12px;
+        height: 12px;
+        margin-top: 4px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #2563eb, #60a5fa);
+        box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.08);
+        flex: 0 0 auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="page-action-panel p-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                    <div class="text-uppercase text-muted small fw-semibold mb-2">UI Automation Hub</div>
+                    <h4 class="mb-2">UI 自动化总览</h4>
+                    <p class="text-muted mb-0">先把脚本中心、定位器库、执行计划和报告回放串起来，再逐步补齐 AI 生成与修复能力。</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ url_for('ui_auto.index', section='scripts') }}" class="btn btn-primary btn-sm">脚本管理</a>
+                    <a href="{{ url_for('ui_auto.index', section='locators') }}" class="btn btn-outline-primary btn-sm">定位器库</a>
+                    <a href="{{ url_for('ui_auto.index', section='executions') }}" class="btn btn-outline-primary btn-sm">执行计划</a>
+                    <a href="{{ url_for('ui_auto.replays_page') }}" class="btn btn-outline-primary btn-sm">报告回放</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card h-100">
+            <div class="stat-label">脚本管理</div>
+            <div class="stat-value">已接入</div>
+            <div class="text-muted small mt-2">脚本列表、版本、批量导入和 AI 生成。</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card h-100">
+            <div class="stat-label">定位器库</div>
+            <div class="stat-value">已接入</div>
+            <div class="text-muted small mt-2">稳定定位器、页面归属、AI 可复用上下文。</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card h-100">
+            <div class="stat-label">执行计划</div>
+            <div class="stat-value">已接入</div>
+            <div class="text-muted small mt-2">并行、定时、重试与任务队列。</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card h-100">
+            <div class="stat-label">报告回放</div>
+            <div class="stat-value">已接入</div>
+            <div class="text-muted small mt-2">Trace、视频、截图和日志统一回看。</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-1">
+    <div class="col-lg-8">
+        <div class="data-card h-100">
+            <div class="data-card-header">
+                <div>
+                    <h5 class="mb-1">推荐落地顺序</h5>
+                    <p class="text-muted mb-0">先把脚本中心打稳，再补执行回放与 AI 生成修复，最后做更细的智能辅助。</p>
+                </div>
+            </div>
+            <div class="p-4">
+                <div class="timeline-list">
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div>
+                            <div class="fw-semibold">第一阶段：脚本中心</div>
+                            <div class="text-muted small">脚本列表、编辑器、版本、标签和基础校验。</div>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div>
+                            <div class="fw-semibold">第二阶段：执行与回放</div>
+                            <div class="text-muted small">浏览器执行、任务队列、截图、视频和 Trace 回放。</div>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div>
+                            <div class="fw-semibold">第三阶段：AI 辅助</div>
+                            <div class="text-muted small">自然语言生成脚本、失败修复建议和断言补全。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="data-card h-100">
+            <div class="data-card-header">
+                <div>
+                    <h5 class="mb-1">快捷入口</h5>
+                    <p class="text-muted mb-0">直接跳到具体模块继续操作。</p>
+                </div>
+            </div>
+            <div class="p-4 d-grid gap-2">
+                <a class="btn btn-outline-primary text-start" href="{{ url_for('ui_auto.index', section='scripts') }}">脚本管理</a>
+                <a class="btn btn-outline-primary text-start" href="{{ url_for('ui_auto.index', section='locators') }}">定位器库</a>
+                <a class="btn btn-outline-primary text-start" href="{{ url_for('ui_auto.index', section='executions') }}">执行计划</a>
+                <a class="btn btn-outline-primary text-start" href="{{ url_for('ui_auto.replays_page') }}">报告回放</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

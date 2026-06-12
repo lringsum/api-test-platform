@@ -1,5 +1,8 @@
 from flask import g, request, session
 
+from app.security import can_access_project, current_project_id as get_security_project_id, get_current_user
+from app.security import ensure_active_project_accessible, set_active_project
+
 SESSION_KEY = "active_project_id"
 
 
@@ -18,16 +21,18 @@ def sync_active_project_id():
             g.active_project_id = None
             return None
 
-        session[SESSION_KEY] = project_id
-        g.active_project_id = project_id
+        if set_active_project(project_id) is None:
+            session.pop(SESSION_KEY, None)
+            g.active_project_id = None
+            return None
         return project_id
 
-    g.active_project_id = session.get(SESSION_KEY)
+    ensure_active_project_accessible()
     return g.active_project_id
 
 
 def get_active_project_id(default=None):
-    value = getattr(g, "active_project_id", session.get(SESSION_KEY))
+    value = getattr(g, "active_project_id", get_security_project_id())
     if value is None:
         return default
     return value
@@ -39,7 +44,11 @@ def resolve_project_id(default=None):
         if raw_value in (None, ""):
             return None
         try:
-            return int(raw_value)
+            project_id = int(raw_value)
         except (TypeError, ValueError):
             return default
+        user = get_current_user()
+        if user and not can_access_project(user, project_id):
+            return default
+        return project_id
     return get_active_project_id(default)

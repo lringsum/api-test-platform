@@ -13,14 +13,14 @@ class ModuleService:
 
     @staticmethod
     def get_by_id(module_id):
-        module = Module.query.get(module_id)
+        module = db.session.get(Module, module_id)
         if not module:
             raise ServiceError("模块不存在。")
         return module
 
     @staticmethod
     def create(project_id, name, description=""):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("所属项目不存在。")
 

@@ -15,6 +15,17 @@ from scripts.ui_regression_registry import API_SCENARIOS
 BASE_URL = "http://127.0.0.1:5000"
 
 
+def login(session):
+    session.get(f"{BASE_URL}/login", timeout=10)
+    response = session.post(
+        f"{BASE_URL}/login",
+        data={"username": "admin", "password": "admin123"},
+        timeout=10,
+        allow_redirects=True,
+    )
+    response.raise_for_status()
+
+
 def execute_request(session, scenario):
     method = scenario["method"].upper()
     kwargs = {"timeout": 10}
@@ -60,6 +71,7 @@ def run_scenario(session, scenario):
 
 def main():
     session = requests.Session()
+    login(session)
     results = [run_scenario(session, scenario) for scenario in API_SCENARIOS]
     overall = "PASS" if all(item["status"] == "PASS" for item in results) else "FAIL"
     payload = {

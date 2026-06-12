@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request
 
 from app.models import Environment, Execution, ExecutionDetail, Project, TestCase
 from app.project_context import resolve_project_id
+from app.security import accessible_project_ids, require_permission
 
 dashboard_bp = Blueprint("dashboard", __name__)
 BJT_OFFSET = timedelta(hours=8)
@@ -12,8 +13,10 @@ DEFAULT_MANUAL_MINUTES_PER_CASE = 3
 
 
 @dashboard_bp.route("/")
+@require_permission("dashboard:view")
 def index():
     selected_project_id = resolve_project_id()
+    accessible_ids = accessible_project_ids()
 
     now_utc = datetime.utcnow()
     today_bjt = (now_utc + BJT_OFFSET).date()
@@ -34,6 +37,10 @@ def index():
     )
     if selected_project_id:
         details_query = details_query.filter(Execution.project_id == selected_project_id)
+    elif accessible_ids:
+        details_query = details_query.filter(Execution.project_id.in_(accessible_ids))
+    else:
+        details_query = details_query.filter(Execution.project_id == -1)
     details = details_query.all()
 
     trend_dates = [trend_start_bjt + timedelta(days=i) for i in range(trend_days)]
@@ -152,17 +159,24 @@ def index():
         reverse=True,
     )[:8]
 
-    stats = {
-        "project_count": Project.query.count(),
-        "testcase_count": TestCase.query.count(),
-        "environment_count": Environment.query.count(),
-        "execution_count": Execution.query.count(),
-    }
+    if accessible_ids:
+        stats = {
+            "project_count": Project.query.filter(Project.id.in_(accessible_ids)).count(),
+            "testcase_count": TestCase.query.filter(TestCase.project_id.in_(accessible_ids)).count(),
+            "environment_count": Environment.query.filter(Environment.project_id.in_(accessible_ids)).count(),
+            "execution_count": Execution.query.filter(Execution.project_id.in_(accessible_ids)).count(),
+        }
+    else:
+        stats = {"project_count": 0, "testcase_count": 0, "environment_count": 0, "execution_count": 0}
     recent_query = Execution.query
     if selected_project_id:
         recent_query = recent_query.filter(Execution.project_id == selected_project_id)
+    elif accessible_ids:
+        recent_query = recent_query.filter(Execution.project_id.in_(accessible_ids))
+    else:
+        recent_query = recent_query.filter(Execution.project_id == -1)
     recent_executions = recent_query.order_by(Execution.created_at.desc()).limit(10).all()
-    projects = Project.query.order_by(Project.created_at.desc()).all()
+    projects = Project.query.filter(Project.id.in_(accessible_ids)).order_by(Project.created_at.desc()).all() if accessible_ids else []
 
     return render_template(
         "dashboard.html",

@@ -26,14 +26,14 @@ class ScenarioExecutionService:
 
     @staticmethod
     def get_scenario_by_id(scenario_id):
-        scenario = Scenario.query.get(scenario_id)
+        scenario = db.session.get(Scenario, scenario_id)
         if not scenario:
             raise ServiceError("场景不存在。")
         return scenario
 
     @staticmethod
     def get_execution_by_id(scenario_execution_id):
-        execution = ScenarioExecution.query.get(scenario_execution_id)
+        execution = db.session.get(ScenarioExecution, scenario_execution_id)
         if not execution:
             raise ServiceError("场景执行记录不存在。")
         return execution

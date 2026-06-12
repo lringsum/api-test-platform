@@ -1,0 +1,585 @@
+{% extends "base.html" %}
+
+{% block title %}UI 脚本管理{% endblock %}
+{% block page_title %}UI 脚本管理{% endblock %}
+{% block page_desc %}脚本中心管理 Python + Playwright 自动化脚本，支持创建、编辑、版本和执行入口。{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>筛选条件</strong>
+        <small class="text-muted">按名称、编码和状态进行筛选</small>
+    </div>
+    <div class="card-body">
+        {% if has_permission('uiauto:script:create') %}
+        <div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
+            <button
+                class="btn btn-outline-primary btn-sm"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#scriptDrawer"
+                data-mode="create"
+                data-form-action="{{ url_for('ui_auto.create_script') }}"
+                data-title="新建脚本">
+                新建脚本
+            </button>
+            <button
+                class="btn btn-outline-info btn-sm"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#aiScriptDrawer">
+                AI 生成
+            </button>
+            <button
+                class="btn btn-outline-secondary btn-sm"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#batchImportDrawer">
+                批量导入
+            </button>
+            <button
+                class="btn btn-primary btn-sm"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#batchGenerateDrawer">
+                批量生成
+            </button>
+        </div>
+        {% endif %}
+        <form method="get" action="{{ url_for('ui_auto.scripts_page') }}" class="d-flex flex-wrap align-items-center gap-3">
+            <div class="input-group" style="width: auto; min-width: 260px;">
+                <span class="input-group-text bg-light text-muted">关键词</span>
+                <input class="form-control" name="keyword" value="{{ keyword or '' }}" placeholder="脚本名称 / 编码 / 描述">
+            </div>
+            <div class="input-group" style="width: auto; min-width: 180px;">
+                <span class="input-group-text bg-light text-muted">状态</span>
+                <select class="form-select" name="status">
+                    <option value="">全部状态</option>
+                    <option value="draft" {% if selected_status == 'draft' %}selected{% endif %}>草稿</option>
+                    <option value="active" {% if selected_status == 'active' %}selected{% endif %}>启用</option>
+                    <option value="disabled" {% if selected_status == 'disabled' %}selected{% endif %}>停用</option>
+                    <option value="archived" {% if selected_status == 'archived' %}selected{% endif %}>归档</option>
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('ui_auto.scripts_page') }}" title="重置"><i class="bi bi-eraser"></i></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>脚本列表</strong>
+        <small class="text-muted">当前共 {{ scripts|length }} 条脚本</small>
+    </div>
+    <div class="card-body p-0">
+        {% if scripts %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 12%;">编码</th>
+                        <th style="width: 16%;">名称</th>
+                        <th style="width: 10%;">状态</th>
+                        <th style="width: 10%;">版本</th>
+                        <th style="width: 14%;">负责人</th>
+                        <th style="width: 16%;">标签</th>
+                        <th style="width: 14%;">更新时间</th>
+                        <th style="width: 8%;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in scripts %}
+                    {% set script = row.script %}
+                    {% set current_version = row.current_version %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ script.code }}</div>
+                            <small class="text-muted">{{ script.language }} / {{ script.framework }}</small>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ script.name }}</div>
+                            <small class="text-muted">{{ script.description or '暂无描述' }}</small>
+                            {% if current_version and current_version.ai_generated %}
+                            <div class="mt-1"><span class="badge bg-info text-dark">AI 生成</span></div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if script.status == 'active' %}
+                            <span class="badge bg-success">启用</span>
+                            {% elif script.status == 'disabled' %}
+                            <span class="badge bg-secondary">停用</span>
+                            {% elif script.status == 'archived' %}
+                            <span class="badge bg-dark">归档</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">草稿</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{% if current_version %}v{{ current_version.version_no }}{% else %}-{% endif %}</div>
+                            <small class="text-muted">{% if current_version %}{{ current_version.change_summary or '暂无变更说明' }}{% else %}暂无版本{% endif %}</small>
+                        </td>
+                        <td>{{ row.owner_name or '未分配' }}</td>
+                        <td>
+                            {% if script.tags %}
+                                {% for tag in script.tags %}
+                                <span class="badge text-bg-light border me-1">{{ tag }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ script.updated_at|bjt }}</td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                {% if has_permission('uiauto:script:edit') %}
+                                <button
+                                    class="btn btn-sm btn-outline-primary"
+                                    type="button"
+                                    data-bs-toggle="offcanvas"
+                                    data-bs-target="#scriptDrawer"
+                                    data-mode="edit"
+                                    data-form-action="{{ url_for('ui_auto.edit_script', script_id=script.id) }}"
+                                    data-title="编辑脚本"
+                                    data-name="{{ script.name | tojson }}"
+                                    data-code="{{ script.code | tojson }}"
+                                    data-description="{{ script.description | tojson }}"
+                                    data-language="{{ script.language | tojson }}"
+                                    data-framework="{{ script.framework | tojson }}"
+                                    data-status="{{ script.status | tojson }}"
+                                    data-tags="{{ script.tags | tojson }}"
+                                    data-entry-file="{{ script.entry_file | tojson }}"
+                                    data-script-content="{{ (current_version.script_content if current_version else default_script_template) | tojson }}"
+                                    data-owner-id="{{ (script.owner_id or '') | tojson }}"
+                                    data-project-id="{{ script.project_id | tojson }}"
+                                    data-change-summary="{{ (current_version.change_summary if current_version else '内容更新') | tojson }}">
+                                    编辑
+                                </button>
+                                {% endif %}
+                                {% if has_permission('uiauto:script:view') %}
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ui_auto.script_versions_page', script_id=script.id) }}">版本</a>
+                                <button
+                                    class="btn btn-sm btn-outline-info"
+                                    type="button"
+                                    data-bs-toggle="offcanvas"
+                                    data-bs-target="#scriptDetailDrawer"
+                                    data-detail="{{ row.detail_payload | tojson }}"
+                                    data-title="脚本详情">
+                                    详情
+                                </button>
+                                {% endif %}
+                                {% if has_permission('uiauto:script:delete') %}
+                                <form method="post" action="{{ url_for('ui_auto.delete_script', script_id=script.id) }}" onsubmit="return confirm('确认删除该脚本吗？删除后相关版本也会一并移除。');">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">删除</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-box m-3">暂无 UI 脚本，先创建一个 Python + Playwright 脚本吧。</div>
+        {% endif %}
+    </div>
+</div>
+
+{% if has_permission('uiauto:script:create') or has_permission('uiauto:script:edit') %}
+<div class="offcanvas offcanvas-end app-edit-drawer" tabindex="-1" id="scriptDrawer" aria-labelledby="scriptDrawerLabel">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title mb-1" id="scriptDrawerLabel">脚本编辑</h5>
+            <div class="text-muted small">支持脚本基础信息、代码内容和版本说明维护，后续可直接交给 AI 生成或修复。</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form method="post" action="{{ url_for('ui_auto.create_script') }}" id="scriptForm">
+            {% if current_project_id %}
+            <input type="hidden" name="project_id" id="scriptProjectId" value="{{ current_project_id }}">
+            {% else %}
+            <div class="drawer-section">
+                <div class="drawer-section-title">所属项目</div>
+                <select class="form-select" name="project_id" id="scriptProjectId" required>
+                    <option value="">请选择项目</option>
+                    {% for project in global_projects %}
+                    <option value="{{ project.id }}">{{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="drawer-section">
+                <div class="drawer-section-title">基础信息</div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">脚本编码</label>
+                        <input class="form-control" name="code" id="scriptCode" placeholder="例如 login_check">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">脚本名称</label>
+                        <input class="form-control" name="name" id="scriptName" placeholder="例如 登录校验">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">状态</label>
+                        <select class="form-select" name="status" id="scriptStatus">
+                            <option value="draft">草稿</option>
+                            <option value="active">启用</option>
+                            <option value="disabled">停用</option>
+                            <option value="archived">归档</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">语言</label>
+                        <select class="form-select" name="language" id="scriptLanguage">
+                            <option value="python">Python</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">框架</label>
+                        <select class="form-select" name="framework" id="scriptFramework">
+                            <option value="playwright">Playwright</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">入口文件</label>
+                        <input class="form-control" name="entry_file" id="scriptEntryFile" placeholder="tests/test_login.py">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">负责人 ID</label>
+                        <input type="number" class="form-control" name="owner_id" id="scriptOwnerId" placeholder="可先留空">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">标签</label>
+                        <input class="form-control" name="tags" id="scriptTags" placeholder="smoke, login, regression">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">描述</label>
+                        <input class="form-control" name="description" id="scriptDescription" placeholder="脚本用途说明">
+                    </div>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-title">脚本内容</div>
+                <textarea class="form-control json-textarea-lg" name="script_content" id="scriptContent" rows="18" spellcheck="false"></textarea>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-title">版本说明</div>
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label">变更说明</label>
+                        <input class="form-control" name="change_summary" id="scriptChangeSummary" value="内容更新" placeholder="例如 新增登录断言">
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-2">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+                <button type="submit" class="btn btn-primary">保存脚本</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% if has_permission('uiauto:script:create') %}
+<div class="offcanvas offcanvas-end app-edit-drawer" tabindex="-1" id="batchImportDrawer" aria-labelledby="batchImportDrawerLabel">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title mb-1" id="batchImportDrawerLabel">批量导入脚本</h5>
+            <div class="text-muted small">支持粘贴 JSON 数组，一次创建多条脚本和首版内容。</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form method="post" action="{{ url_for('ui_auto.batch_import_scripts') }}">
+            {% if current_project_id %}
+            <input type="hidden" name="project_id" value="{{ current_project_id }}">
+            {% else %}
+            <div class="drawer-section">
+                <div class="drawer-section-title">选择项目</div>
+                <select class="form-select" name="project_id" required>
+                    <option value="">请选择项目</option>
+                    {% for project in global_projects %}
+                    <option value="{{ project.id }}">{{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="drawer-section">
+                <div class="drawer-section-title">导入内容</div>
+                <textarea
+                    class="form-control json-textarea-lg"
+                    name="batch_scripts_json"
+                    rows="18"
+                    placeholder='[{"name":"登录脚本","code":"login_smoke","script_content":"from playwright.sync_api import expect\\n\\ndef test_login(page, base_url):\\n    ...","status":"draft","entry_file":"tests/test_login.py"}]'></textarea>
+                <div class="form-text mt-2">字段支持：name、code、description、status、tags、entry_file、script_content、owner_id。</div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 pt-2">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+                <button type="submit" class="btn btn-primary">开始导入</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-end app-edit-drawer" tabindex="-1" id="batchGenerateDrawer" aria-labelledby="batchGenerateDrawerLabel">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title mb-1" id="batchGenerateDrawerLabel">批量生成脚本</h5>
+            <div class="text-muted small">支持粘贴 JSON 数组，一次让 AI 生成多条脚本草稿。</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form method="post" action="{{ url_for('ui_auto.batch_generate_scripts') }}">
+            {% if current_project_id %}
+            <input type="hidden" name="project_id" value="{{ current_project_id }}">
+            {% else %}
+            <div class="drawer-section">
+                <div class="drawer-section-title">选择项目</div>
+                <select class="form-select" name="project_id" required>
+                    <option value="">请选择项目</option>
+                    {% for project in global_projects %}
+                    <option value="{{ project.id }}">{{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <div class="drawer-section">
+                <div class="drawer-section-title">生成任务</div>
+                <textarea
+                    class="form-control json-textarea-lg"
+                    name="batch_jobs_json"
+                    rows="18"
+                    placeholder='[{"script_name":"登录冒烟脚本","script_code":"login_smoke_ai","test_goal":"登录后进入 Dashboard 并校验标题","page_url":"/dashboard","page_name":"Dashboard","need_login":true,"login_url":"/login","assert_text":"Dashboard","locator_codes":"login_button"}]'></textarea>
+                <div class="form-text mt-2">字段支持：script_name、script_code、test_goal、page_url、page_name、need_login、assert_text、locator_codes。</div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 pt-2">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+                <button type="submit" class="btn btn-primary">开始生成</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% if has_permission('uiauto:script:view') %}
+<div class="offcanvas offcanvas-end app-edit-drawer" tabindex="-1" id="scriptDetailDrawer" aria-labelledby="scriptDetailDrawerLabel">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title mb-1" id="scriptDetailDrawerLabel">脚本详情</h5>
+            <div class="text-muted small">查看当前版本、版本历史和最近执行记录。</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="drawer-section">
+            <div class="drawer-section-title">基础信息</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">名称</label>
+                    <input class="form-control" id="detailScriptName" readonly>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">编码</label>
+                    <input class="form-control" id="detailScriptCode" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">状态</label>
+                    <input class="form-control" id="detailScriptStatus" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">版本数</label>
+                    <input class="form-control" id="detailVersionCount" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">负责人</label>
+                    <input class="form-control" id="detailOwnerName" readonly>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">入口文件</label>
+                    <input class="form-control" id="detailEntryFile" readonly>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">语言 / 框架</label>
+                    <input class="form-control" id="detailFramework" readonly>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">描述</label>
+                    <textarea class="form-control" id="detailDescription" rows="2" readonly></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="drawer-section">
+            <div class="drawer-section-title">当前版本</div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">版本号</label>
+                    <input class="form-control" id="detailCurrentVersionNo" readonly>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">变更说明</label>
+                    <input class="form-control" id="detailCurrentVersionSummary" readonly>
+                </div>
+                <div class="col-12">
+                    <label class="form-label">脚本内容</label>
+                    <pre class="detail-code-block" id="detailCurrentVersionContent"></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="drawer-section">
+            <div class="drawer-section-title">AI 提示词</div>
+            <pre class="detail-code-block" id="detailAiPrompt"></pre>
+        </div>
+
+        <div class="drawer-section">
+            <div class="drawer-section-title">最近执行</div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>状态</th>
+                            <th>环境</th>
+                            <th>浏览器</th>
+                            <th>模式</th>
+                            <th>时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detailRecentRunsBody">
+                        <tr><td colspan="6" class="text-muted">暂无记录</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 pt-2">
+            <a class="btn btn-outline-primary" href="#" id="detailVersionLink">查看版本</a>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">关闭</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const scriptDetailDrawer = document.getElementById('scriptDetailDrawer');
+    const scriptDrawer = document.getElementById('scriptDrawer');
+    if (scriptDrawer) {
+        scriptDrawer.addEventListener('show.bs.offcanvas', event => {
+            const trigger = event.relatedTarget;
+            const form = document.getElementById('scriptForm');
+            if (!trigger || !form) return;
+
+            const readValue = value => {
+                if (value === undefined || value === null || value === '') {
+                    return '';
+                }
+                try {
+                    return JSON.parse(value);
+                } catch (error) {
+                    return value;
+                }
+            };
+
+            const mode = trigger.dataset.mode || 'create';
+            form.action = trigger.dataset.formAction || form.action;
+            document.getElementById('scriptDrawerLabel').textContent = trigger.dataset.title || (mode === 'edit' ? '编辑脚本' : '新建脚本');
+
+            if (mode !== 'edit') {
+                form.reset();
+                document.getElementById('scriptLanguage').value = 'python';
+                document.getElementById('scriptFramework').value = 'playwright';
+                document.getElementById('scriptStatus').value = 'draft';
+                document.getElementById('scriptEntryFile').value = 'tests/test_example.py';
+                document.getElementById('scriptChangeSummary').value = '内容更新';
+                document.getElementById('scriptContent').value = {{ default_script_template | tojson }};
+                const projectInput = document.getElementById('scriptProjectId');
+                if (projectInput && trigger.dataset.projectId) {
+                    projectInput.value = trigger.dataset.projectId;
+                }
+                return;
+            }
+
+            document.getElementById('scriptName').value = readValue(trigger.dataset.name);
+            document.getElementById('scriptCode').value = readValue(trigger.dataset.code);
+            document.getElementById('scriptDescription').value = readValue(trigger.dataset.description);
+            document.getElementById('scriptLanguage').value = readValue(trigger.dataset.language) || 'python';
+            document.getElementById('scriptFramework').value = readValue(trigger.dataset.framework) || 'playwright';
+            document.getElementById('scriptStatus').value = readValue(trigger.dataset.status) || 'draft';
+            document.getElementById('scriptTags').value = (readValue(trigger.dataset.tags) || []).join(', ');
+            document.getElementById('scriptEntryFile').value = readValue(trigger.dataset.entryFile);
+            document.getElementById('scriptContent').value = readValue(trigger.dataset.scriptContent) || {{ default_script_template | tojson }};
+            document.getElementById('scriptOwnerId').value = readValue(trigger.dataset.ownerId);
+            document.getElementById('scriptChangeSummary').value = readValue(trigger.dataset.changeSummary) || '内容更新';
+
+            const projectInput = document.getElementById('scriptProjectId');
+            if (projectInput && trigger.dataset.projectId) {
+                projectInput.value = trigger.dataset.projectId;
+            }
+        });
+    }
+
+    if (scriptDetailDrawer) {
+        scriptDetailDrawer.addEventListener('show.bs.offcanvas', event => {
+            const trigger = event.relatedTarget;
+            const readValue = value => {
+                if (value === undefined || value === null || value === '') {
+                    return '';
+                }
+                try {
+                    return JSON.parse(value);
+                } catch (error) {
+                    return value;
+                }
+            };
+
+            if (!trigger) {
+                return;
+            }
+
+            const detail = readValue(trigger.dataset.detail) || {};
+            document.getElementById('detailScriptName').value = detail.name || '';
+            document.getElementById('detailScriptCode').value = detail.code || '';
+            document.getElementById('detailScriptStatus').value = detail.status || '';
+            document.getElementById('detailVersionCount').value = detail.version_count ?? 0;
+            document.getElementById('detailOwnerName').value = detail.owner_name || '';
+            document.getElementById('detailEntryFile').value = detail.entry_file || '';
+            document.getElementById('detailFramework').value = [detail.language, detail.framework].filter(Boolean).join(' / ');
+            document.getElementById('detailDescription').value = detail.description || '';
+            document.getElementById('detailCurrentVersionNo').value = detail.current_version_no ? `v${detail.current_version_no}` : '-';
+            document.getElementById('detailCurrentVersionSummary').value = detail.current_version_summary || '';
+            document.getElementById('detailCurrentVersionContent').textContent = detail.current_version_content || '';
+            document.getElementById('detailAiPrompt').textContent = detail.ai_prompt || '暂无 AI 提示词';
+            document.getElementById('detailVersionLink').href = detail.script_id ? `/ui-automation/scripts/${detail.script_id}/versions` : '#';
+
+            const runsBody = document.getElementById('detailRecentRunsBody');
+            const runs = Array.isArray(detail.recent_runs) ? detail.recent_runs : [];
+            if (!runs.length) {
+                runsBody.innerHTML = '<tr><td colspan="6" class="text-muted">暂无记录</td></tr>';
+                return;
+            }
+            runsBody.innerHTML = runs.map(item => {
+                const statusClass = item.status === 'passed' ? 'bg-success' : item.status === 'failed' ? 'bg-danger' : 'bg-secondary';
+                return `<tr>
+                    <td>${item.id ?? '-'}</td>
+                    <td><span class="badge ${statusClass}">${item.status || '-'}</span></td>
+                    <td>${item.environment_name || '-'}</td>
+                    <td>${item.browser_type || '-'}</td>
+                    <td>${item.run_mode || '-'}</td>
+                    <td>${item.created_at || '-'}</td>
+                </tr>`;
+            }).join('');
+        });
+    }
+</script>
+{% endblock %}

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
+from app.security import accessible_projects, require_permission
 from app.services.base_service import ServiceError
 from app.services.project_service import ProjectService
 
@@ -8,11 +9,12 @@ project_bp = Blueprint("project", __name__, url_prefix="/projects")
 
 
 @project_bp.route("/")
+@require_permission("project:view")
 def list_projects():
     keyword = (request.args.get("keyword") or "").strip()
     status = (request.args.get("status") or "").strip()
 
-    projects = ProjectService.list_all()
+    projects = accessible_projects()
     if keyword:
         projects = [p for p in projects if keyword.lower() in p.name.lower()]
     if status:
@@ -27,6 +29,7 @@ def list_projects():
 
 
 @project_bp.route("/create", methods=["POST"])
+@require_permission("project:create")
 def create_project():
     try:
         ProjectService.create(
@@ -39,6 +42,7 @@ def create_project():
 
 
 @project_bp.route("/<int:project_id>/edit", methods=["POST"])
+@require_permission("project:edit")
 def edit_project(project_id):
     try:
         ProjectService.update(
@@ -53,6 +57,7 @@ def edit_project(project_id):
 
 
 @project_bp.route("/<int:project_id>/delete", methods=["POST"])
+@require_permission("project:delete")
 def delete_project(project_id):
     try:
         ProjectService.delete(project_id)

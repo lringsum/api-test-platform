@@ -1,4 +1,4 @@
-﻿import math
+import math
 import re
 from dataclasses import dataclass, field
 
@@ -332,18 +332,18 @@ class TestCaseService:
 
     @staticmethod
     def get_by_id(testcase_id):
-        testcase = TestCase.query.get(testcase_id)
+        testcase = db.session.get(TestCase, testcase_id)
         if not testcase:
             raise ServiceError("用例不存在。")
         return testcase
 
     @staticmethod
     def create(project_id, module_id, name, case_data, description="", source="manual", is_active=True):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("所属项目不存在。")
 
-        module = Module.query.get(module_id)
+        module = db.session.get(Module, module_id)
         if not module or module.project_id != project_id:
             raise ServiceError("所属模块不存在或与项目不匹配。")
 
@@ -379,7 +379,7 @@ class TestCaseService:
     @staticmethod
     def update(testcase_id, module_id, name, case_data, description="", source="manual", is_active=True):
         testcase = TestCaseService.get_by_id(testcase_id)
-        module = Module.query.get(module_id)
+        module = db.session.get(Module, module_id)
         if not module or module.project_id != testcase.project_id:
             raise ServiceError("所属模块不存在或与项目不匹配。")
 

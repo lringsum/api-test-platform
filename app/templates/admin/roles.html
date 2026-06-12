@@ -1,0 +1,519 @@
+{% extends "base.html" %}
+
+{% block title %}角色管理{% endblock %}
+{% block page_title %}角色管理{% endblock %}
+{% block page_desc %}配置菜单与按钮权限{% endblock %}
+
+{% block content %}
+<style>
+    .role-page-hero {
+        border: 1px solid rgba(13, 110, 253, 0.12);
+        background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(13, 110, 253, 0.02));
+        border-radius: 18px;
+        padding: 18px 20px;
+        margin-bottom: 18px;
+    }
+    .role-page-hero h5 { margin-bottom: 6px; font-weight: 700; }
+    .role-page-hero .text-muted { font-size: .92rem; }
+    .permission-picker {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 18px;
+        background: #fff;
+        padding: 16px;
+        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04);
+    }
+    .permission-picker-toolbar, .permission-picker-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .permission-picker-toolbar {
+        padding-bottom: 14px;
+        margin-bottom: 14px;
+        border-bottom: 1px dashed rgba(15, 23, 42, 0.12);
+    }
+    .permission-picker-title { font-size: .98rem; font-weight: 700; color: #0f172a; }
+    .permission-picker-subtitle { color: #64748b; font-size: .84rem; margin-top: 3px; }
+    .permission-search {
+        min-width: 240px;
+        border-radius: 999px;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    .permission-group-grid { --bs-gutter-y: 1rem; }
+    .permission-group-card {
+        height: 100%;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+        overflow: hidden;
+    }
+    .permission-group-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 14px 14px 12px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        background: rgba(248, 250, 252, 0.9);
+    }
+    .permission-group-name { font-weight: 700; color: #0f172a; line-height: 1.2; }
+    .permission-group-meta { font-size: .82rem; color: #64748b; margin-top: 4px; }
+    .permission-group-body { padding: 12px; display: grid; gap: 8px; }
+    .permission-chip {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+        cursor: pointer;
+        transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .permission-chip:hover {
+        border-color: rgba(13, 110, 253, 0.35);
+        box-shadow: 0 8px 18px rgba(13, 110, 253, 0.08);
+        transform: translateY(-1px);
+    }
+    .permission-chip .form-check-input { margin-top: 0.18rem; flex: 0 0 auto; }
+    .permission-chip-content { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .permission-chip-name { font-size: .92rem; color: #0f172a; line-height: 1.25; word-break: break-word; }
+    .permission-chip-code {
+        display: inline-flex;
+        width: fit-content;
+        padding: 0.1rem 0.4rem;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #4f46e5;
+        font-size: .74rem;
+        border: 0;
+    }
+    .permission-chip.is-hidden { display: none; }
+    .permission-chip input:checked + .permission-chip-content .permission-chip-name { color: #0b5ed7; font-weight: 600; }
+    .permission-picker-hint { color: #64748b; font-size: .86rem; }
+    .permission-count-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: .82rem;
+        font-weight: 600;
+    }
+    .permission-compact-actions .btn { border-radius: 999px; }
+    .role-drawer {
+        --bs-offcanvas-width: min(1500px, 92vw);
+        width: min(1500px, 92vw);
+    }
+    .role-drawer .offcanvas-body {
+        background: #f8fafc;
+    }
+    .drawer-section {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+    }
+    .drawer-section-title {
+        font-weight: 700;
+        margin-bottom: 12px;
+        color: #0f172a;
+    }
+    .editor-summary {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+        border-bottom: 1px dashed rgba(15, 23, 42, 0.12);
+    }
+    .editor-summary-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        color: #64748b;
+        font-size: .86rem;
+    }
+    .role-list-card {
+        border-radius: 18px;
+        overflow: hidden;
+    }
+    .role-list-card .card-header {
+        background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+    }
+    .role-row.is-active { background: rgba(13, 110, 253, 0.04); }
+    @media (max-width: 576px) {
+        .permission-search { width: 100%; min-width: 0; }
+        .permission-group-head { flex-direction: column; }
+    }
+</style>
+
+{% macro render_permission_picker(selected_codes=[], picker_id='', editor_mode=false) %}
+<div class="permission-picker" data-permission-picker {% if picker_id %}id="{{ picker_id }}"{% endif %} {% if editor_mode %}data-editor-picker="1"{% endif %}>
+    <div class="permission-picker-toolbar">
+        <div>
+            <div class="permission-picker-title">权限选择器</div>
+            <div class="permission-picker-subtitle">支持按名称或编码搜索，分组全选、清空和快速批量勾选</div>
+        </div>
+        <div class="d-flex flex-column align-items-end gap-2">
+            <input type="search" class="form-control form-control-sm permission-search" data-permission-search placeholder="搜索权限名称 / 编码">
+            <div class="permission-count-badge">已选 <span data-selected-count>0</span> 项</div>
+        </div>
+    </div>
+
+    <div class="row g-3 permission-group-grid">
+        {% for group_name, items in grouped_permissions.items() %}
+        <div class="col-xl-3 col-lg-4 col-md-6">
+            <section class="permission-group-card" data-permission-group>
+                <div class="permission-group-head">
+                    <div>
+                        <div class="permission-group-name">{{ group_name }}</div>
+                        <div class="permission-group-meta"><span data-group-selected>0</span> / {{ items|length }} 已勾选</div>
+                    </div>
+                    <div class="btn-group btn-group-sm permission-compact-actions" role="group">
+                        <button type="button" class="btn btn-outline-primary" data-group-action="all">全选</button>
+                        <button type="button" class="btn btn-outline-secondary" data-group-action="none">清空</button>
+                    </div>
+                </div>
+                <div class="permission-group-body">
+                    {% for permission in items %}
+                    <label class="permission-chip" data-permission-item data-permission-text="{{ permission.name }} {{ permission.code }}">
+                        <input class="form-check-input permission-checkbox" type="checkbox" name="permission_codes" value="{{ permission.code }}" {% if permission.code in selected_codes %}checked{% endif %}>
+                        <span class="permission-chip-content">
+                            <span class="permission-chip-name">{{ permission.name }}</span>
+                            <code class="permission-chip-code">{{ permission.code }}</code>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="permission-picker-footer mt-3 pt-3" style="border-top: 1px dashed rgba(15,23,42,0.12);">
+        <div class="permission-picker-hint">提示：先用搜索定位，再按组全选，最后微调少量权限。</div>
+        <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-primary" data-picker-action="all">全选全部</button>
+            <button type="button" class="btn btn-outline-secondary" data-picker-action="none">全部清空</button>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+<div class="role-page-hero">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+            <h5>角色权限配置</h5>
+            <div class="text-muted">左边看列表，点击编辑后从右侧展开整页抽屉，默认是隐藏的。</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <span class="badge text-bg-light border">点击展开</span>
+            <span class="badge text-bg-light border">右侧整页抽屉</span>
+            <span class="badge text-bg-light border">支持搜索</span>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4 page-action-panel">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
+        <strong>新建角色</strong>
+        <button class="btn btn-sm btn-outline-primary page-action-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#createRolePanel" aria-expanded="false">
+            <i class="bi bi-chevron-down"></i>
+        </button>
+    </div>
+    <div class="collapse" id="createRolePanel">
+        <div class="card-body page-action-panel-body">
+            <form method="post" action="{{ url_for('admin.create_role') }}">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label">编码</label>
+                        <input type="text" class="form-control" name="code" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">名称</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">描述</label>
+                        <input type="text" class="form-control" name="description">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">排序</label>
+                        <input type="number" class="form-control" name="sort_order" value="0">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">系统</label>
+                        <select class="form-select" name="is_system">
+                            <option value="0" selected>否</option>
+                            <option value="1">是</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        {{ render_permission_picker() }}
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                        <button class="btn btn-primary" type="submit">创建角色</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card role-list-card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>角色列表</strong>
+        <small class="text-muted">点击“编辑”从右侧展开整页编辑抽屉</small>
+    </div>
+    <div class="card-body p-0">
+        {% if roles %}
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered align-middle mb-0">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>编码</th>
+                    <th>名称</th>
+                    <th>权限数量</th>
+                    <th>系统</th>
+                    <th width="220">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in roles %}
+                <tr class="role-row" data-role-row data-role-id="{{ item.id }}">
+                    <td>{{ item.id }}</td>
+                    <td><code>{{ item.code }}</code></td>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.permissions|length }}</td>
+                    <td>
+                        {% if item.is_system %}
+                        <span class="badge bg-primary">系统角色</span>
+                        {% else %}
+                        <span class="badge bg-secondary">自定义</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-role-select data-role-id="{{ item.id }}" data-bs-toggle="offcanvas" data-bs-target="#roleDrawer" aria-controls="roleDrawer">编辑</button>
+                            {% if not item.is_system %}
+                            <form method="post" action="{{ url_for('admin.delete_role', role_id=item.id) }}" onsubmit="return confirm('确认删除该角色吗？');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit">删除</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-box m-3">暂无角色</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-end role-drawer" tabindex="-1" id="roleDrawer" aria-labelledby="roleDrawerLabel">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title" id="roleDrawerLabel">编辑角色</h5>
+            <small class="text-muted">点击编辑后才打开，默认隐藏</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form id="roleEditorForm" method="post" data-action-template="/admin/roles/__ROLE_ID__/edit">
+            <div class="editor-summary">
+                <div>
+                    <div class="fw-semibold" id="roleEditorTitle">-</div>
+                    <div class="editor-summary-meta">
+                        <span class="badge text-bg-light border" id="roleEditorIdBadge">#-</span>
+                        <span class="badge text-bg-light border">当前权限 <span id="roleEditorCount">0</span> 项</span>
+                        <span class="badge bg-primary" id="roleEditorTypeBadge">系统角色</span>
+                    </div>
+                </div>
+                <div class="text-muted small">修改后直接保存即可，不需要离开当前页面。</div>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-title">基础信息</div>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">编码</label>
+                        <input class="form-control" name="code">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">名称</label>
+                        <input class="form-control" name="name">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">描述</label>
+                        <input class="form-control" name="description">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">排序</label>
+                        <input class="form-control" type="number" name="sort_order">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">系统</label>
+                        <select class="form-select" name="is_system">
+                            <option value="1">是</option>
+                            <option value="0">否</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-title">权限配置</div>
+                {{ render_permission_picker([], 'roleEditorPicker', true) }}
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="offcanvas">取消</button>
+                <button class="btn btn-success" type="submit">保存修改</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script id="rolePayloadsData" type="application/json">{{ role_payloads|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const rolePayloads = JSON.parse(document.getElementById("rolePayloadsData").textContent || "[]");
+    const roleEditorForm = document.getElementById("roleEditorForm");
+    const roleEditorTitle = document.getElementById("roleEditorTitle");
+    const roleEditorIdBadge = document.getElementById("roleEditorIdBadge");
+    const roleEditorCount = document.getElementById("roleEditorCount");
+    const roleEditorTypeBadge = document.getElementById("roleEditorTypeBadge");
+    const editorPicker = document.getElementById("roleEditorPicker");
+
+    function updatePicker(picker) {
+        const selected = picker.querySelectorAll(".permission-checkbox:checked").length;
+        const selectedCountEl = picker.querySelector("[data-selected-count]");
+        if (selectedCountEl) selectedCountEl.textContent = selected;
+        if (picker.id === "roleEditorPicker" && roleEditorCount) roleEditorCount.textContent = selected;
+
+        picker.querySelectorAll("[data-permission-group]").forEach((group) => {
+            const items = Array.from(group.querySelectorAll("[data-permission-item]"));
+            const visibleItems = items.filter((item) => !item.classList.contains("is-hidden"));
+            const groupSelected = group.querySelectorAll(".permission-checkbox:checked").length;
+            const groupSelectedEl = group.querySelector("[data-group-selected]");
+            if (groupSelectedEl) groupSelectedEl.textContent = groupSelected;
+            group.style.display = visibleItems.length ? "" : "none";
+        });
+    }
+
+    function setPickerCheckedCodes(picker, codes) {
+        const codeSet = new Set(codes || []);
+        picker.querySelectorAll(".permission-checkbox").forEach((checkbox) => {
+            checkbox.checked = codeSet.has(checkbox.value);
+        });
+        updatePicker(picker);
+    }
+
+    function setupPicker(picker) {
+        const searchInput = picker.querySelector("[data-permission-search]");
+        searchInput?.addEventListener("input", function () {
+            const keyword = this.value.trim().toLowerCase();
+            picker.querySelectorAll("[data-permission-item]").forEach((item) => {
+                const text = (item.dataset.permissionText || "").toLowerCase();
+                item.classList.toggle("is-hidden", keyword && !text.includes(keyword));
+            });
+            updatePicker(picker);
+        });
+
+        picker.addEventListener("change", (event) => {
+            if (event.target.matches(".permission-checkbox")) updatePicker(picker);
+        });
+
+        picker.addEventListener("click", (event) => {
+            const groupButton = event.target.closest("[data-group-action]");
+            if (groupButton) {
+                const group = groupButton.closest("[data-permission-group]");
+                if (!group) return;
+                const checked = groupButton.dataset.groupAction === "all";
+                group.querySelectorAll(".permission-checkbox").forEach((checkbox) => {
+                    const item = checkbox.closest("[data-permission-item]");
+                    if (item && !item.classList.contains("is-hidden")) checkbox.checked = checked;
+                });
+                updatePicker(picker);
+                return;
+            }
+
+            const pickerButton = event.target.closest("[data-picker-action]");
+            if (pickerButton) {
+                const checked = pickerButton.dataset.pickerAction === "all";
+                picker.querySelectorAll("[data-permission-group]").forEach((group) => {
+                    group.querySelectorAll(".permission-checkbox").forEach((checkbox) => {
+                        const item = checkbox.closest("[data-permission-item]");
+                        if (item && !item.classList.contains("is-hidden")) checkbox.checked = checked;
+                    });
+                });
+                updatePicker(picker);
+            }
+        });
+
+        updatePicker(picker);
+    }
+
+    function setActiveRow(roleId) {
+        document.querySelectorAll("[data-role-row]").forEach((row) => {
+            row.classList.toggle("is-active", String(row.dataset.roleId) === String(roleId));
+        });
+    }
+
+    function applyRole(roleId) {
+        const role = rolePayloads.find((item) => String(item.id) === String(roleId));
+        if (!role || !roleEditorForm || !editorPicker) return;
+
+        roleEditorForm.action = roleEditorForm.dataset.actionTemplate.replace("__ROLE_ID__", role.id);
+        roleEditorForm.querySelector('[name="code"]').value = role.code || "";
+        roleEditorForm.querySelector('[name="name"]').value = role.name || "";
+        roleEditorForm.querySelector('[name="description"]').value = role.description || "";
+        roleEditorForm.querySelector('[name="sort_order"]').value = role.sort_order ?? 0;
+        roleEditorForm.querySelector('[name="is_system"]').value = role.is_system ? "1" : "0";
+
+        roleEditorTitle.textContent = role.name || "角色编辑";
+        roleEditorIdBadge.textContent = `#${role.id}`;
+        roleEditorTypeBadge.textContent = role.is_system ? "系统角色" : "自定义角色";
+        setPickerCheckedCodes(editorPicker, role.permission_codes || []);
+        setActiveRow(role.id);
+    }
+
+    setupPicker(editorPicker);
+    document.querySelectorAll("[data-permission-picker]").forEach((picker) => {
+        if (picker.id !== "roleEditorPicker") setupPicker(picker);
+    });
+
+    document.querySelectorAll("[data-role-select]").forEach((button) => {
+        button.addEventListener("click", function () {
+            applyRole(this.dataset.roleId);
+        });
+    });
+
+    const roleDrawerEl = document.getElementById("roleDrawer");
+    roleDrawerEl?.addEventListener("show.bs.offcanvas", function (event) {
+        const trigger = event.relatedTarget;
+        const roleId = trigger?.dataset?.roleId || rolePayloads[0]?.id;
+        if (roleId) applyRole(roleId);
+    });
+
+    if (rolePayloads.length) applyRole(rolePayloads[0].id);
+})();
+</script>
+{% endblock %}

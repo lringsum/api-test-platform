@@ -10,16 +10,60 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
+    <style>
+        .app-edit-drawer {
+            --bs-offcanvas-width: min(1240px, 94vw);
+            width: min(1240px, 94vw);
+            border-left: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: -24px 0 60px rgba(15, 23, 42, 0.18);
+            will-change: transform;
+            backface-visibility: hidden;
+            transform: translate3d(100%, 0, 0);
+            transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.34s ease;
+        }
+        .app-edit-drawer.show {
+            transform: translate3d(0, 0, 0);
+        }
+        .offcanvas-backdrop,
+        .offcanvas-backdrop.fade,
+        .offcanvas-backdrop.show {
+            opacity: 0 !important;
+            background-color: transparent !important;
+            backdrop-filter: none !important;
+            transition: none !important;
+        }
+        .app-edit-drawer .offcanvas-header {
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        }
+        .app-edit-drawer .offcanvas-body {
+            background: #f8fafc;
+        }
+        .app-edit-drawer .drawer-section {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fff;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+        }
+        .app-edit-drawer .drawer-section-title {
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #0f172a;
+        }
+    </style>
     {% block head %}{% endblock %}
 </head>
 <body>
 <div class="app-shell">
-    <aside class="sidebar bg-dark text-white">
+    <aside class="sidebar">
         <div class="sidebar-brand">
             <h4 class="mb-0">API 测试平台</h4>
             <small class="text-light-emphasis">Flask + Bootstrap 5</small>
         </div>
 
+        {% if current_user and has_permission('project:view') %}
         <div class="sidebar-project-card">
             <div class="sidebar-project-card-header">
                 <div class="sidebar-project-label">当前项目</div>
@@ -38,13 +82,17 @@
                 </select>
             </form>
         </div>
+        {% endif %}
 
         {% set overview_active = request.path == '/' %}
-        {% set resource_active = request.path.startswith('/projects') or request.path.startswith('/modules') or request.path.startswith('/environments') or request.path.startswith('/variables') %}
-        {% set design_active = request.path.startswith('/testcases') or request.path.startswith('/ai') or request.path.startswith('/prompts') or request.path.startswith('/scenarios') %}
+        {% set api_active = request.path.startswith('/projects') or request.path.startswith('/modules') or request.path.startswith('/environments') or request.path.startswith('/variables') or request.path.startswith('/testcases') or request.path.startswith('/scenarios') %}
+        {% set ui_active = request.path.startswith('/ui-automation') %}
+        {% set assist_active = request.path.startswith('/ai') or request.path.startswith('/prompts') %}
         {% set report_active = request.path.startswith('/reports') or request.path.startswith('/executions/history') or (request.path.startswith('/executions/') and not request.path.startswith('/executions/run')) %}
+        {% set admin_active = request.path.startswith('/admin') %}
 
         <nav class="nav flex-column mt-3 sidebar-nav-groups">
+            {% if has_permission('dashboard:view') %}
             <div class="nav-group">
                 <button class="nav-link nav-group-toggle {% if overview_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupOverview" aria-expanded="{{ 'true' if overview_active else 'false' }}">
                     总览
@@ -55,46 +103,118 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
 
+            {% if has_permission('project:view') or has_permission('module:view') or has_permission('environment:view') or has_permission('variable:view') or has_permission('testcase:view') or has_permission('scenario:view') %}
             <div class="nav-group">
-                <button class="nav-link nav-group-toggle {% if resource_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupResource" aria-expanded="{{ 'true' if resource_active else 'false' }}">
-                    资源配置
+                <button class="nav-link nav-group-toggle {% if api_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupApi" aria-expanded="{{ 'true' if api_active else 'false' }}">
+                    API 测试
                 </button>
-                <div class="collapse {% if resource_active %}show{% endif %}" id="groupResource">
+                <div class="collapse {% if api_active %}show{% endif %}" id="groupApi">
                     <div class="nav flex-column nav-group-menu">
+                        {% if has_permission('project:view') %}
                         <a class="nav-link nav-sublink {% if request.path.startswith('/projects') %}active{% endif %}" href="{{ url_for('project.list_projects') }}">项目管理</a>
+                        {% endif %}
+                        {% if has_permission('module:view') %}
                         <a class="nav-link nav-sublink {% if request.path.startswith('/modules') %}active{% endif %}" href="{{ url_for('module.list_modules') }}">模块管理</a>
+                        {% endif %}
+                        {% if has_permission('environment:view') %}
                         <a class="nav-link nav-sublink {% if request.path.startswith('/environments') %}active{% endif %}" href="{{ url_for('environment.list_environments') }}">环境管理</a>
+                        {% endif %}
+                        {% if has_permission('variable:view') %}
                         <a class="nav-link nav-sublink {% if request.path.startswith('/variables') %}active{% endif %}" href="{{ url_for('variable.list_variables') }}">变量管理</a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="nav-group">
-                <button class="nav-link nav-group-toggle {% if design_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupDesign" aria-expanded="{{ 'true' if design_active else 'false' }}">
-                    测试设计
-                </button>
-                <div class="collapse {% if design_active %}show{% endif %}" id="groupDesign">
-                    <div class="nav flex-column nav-group-menu">
+                        {% endif %}
+                        {% if has_permission('testcase:view') %}
                         <a class="nav-link nav-sublink {% if request.path.startswith('/testcases') %}active{% endif %}" href="{{ url_for('testcase.list_testcases') }}">用例管理</a>
+                        {% endif %}
+                        {% if has_permission('scenario:view') %}
                         <a class="nav-link nav-sublink {% if request.path.startswith('/scenarios') %}active{% endif %}" href="{{ url_for('scenario.list_scenarios') }}">场景管理</a>
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/ai') %}active{% endif %}" href="{{ url_for('ai.parser_page') }}">AI 解析</a>
-                        <a class="nav-link nav-sublink {% if request.path.startswith('/prompts') %}active{% endif %}" href="{{ url_for('prompt.list_prompts') }}">Prompt 模板</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
+            {% endif %}
 
+            {% if has_permission('uiauto:view') or has_permission('uiauto:script:view') or has_permission('uiauto:locator:view') %}
+            <div class="nav-group">
+                <button class="nav-link nav-group-toggle {% if ui_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupUiAuto" aria-expanded="{{ 'true' if ui_active else 'false' }}">
+                    UI 自动化
+                </button>
+                <div class="collapse {% if ui_active %}show{% endif %}" id="groupUiAuto">
+                    <div class="nav flex-column nav-group-menu">
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation') %}active{% endif %}" href="{{ url_for('ui_auto.index') }}">自动化总览</a>
+                        {% if has_permission('uiauto:script:view') %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/scripts') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='scripts') }}">脚本管理</a>
+                        {% endif %}
+                        {% if has_permission('uiauto:locator:view') %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/locators') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='locators') }}">定位器库</a>
+                        {% endif %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/executions') %}active{% endif %}" href="{{ url_for('ui_auto.index', section='executions') }}">执行计划</a>
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ui-automation/replays') %}active{% endif %}" href="{{ url_for('ui_auto.replays_page') }}">报告回放</a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if has_permission('ai:use') or has_permission('prompt:view') %}
+            <div class="nav-group">
+                <button class="nav-link nav-group-toggle {% if assist_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupAssist" aria-expanded="{{ 'true' if assist_active else 'false' }}">
+                    智能辅助
+                </button>
+                <div class="collapse {% if assist_active %}show{% endif %}" id="groupAssist">
+                    <div class="nav flex-column nav-group-menu">
+                        {% if has_permission('ai:use') %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/ai') %}active{% endif %}" href="{{ url_for('ai.parser_page') }}">AI 解析</a>
+                        {% endif %}
+                        {% if has_permission('prompt:view') %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/prompts') %}active{% endif %}" href="{{ url_for('prompt.list_prompts') }}">Prompt 模板</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if has_permission('execution:view') or has_permission('report:view') %}
             <div class="nav-group">
                 <button class="nav-link nav-group-toggle {% if report_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupReport" aria-expanded="{{ 'true' if report_active else 'false' }}">
                     执行与报告
                 </button>
                 <div class="collapse {% if report_active %}show{% endif %}" id="groupReport">
                     <div class="nav flex-column nav-group-menu">
+                        {% if has_permission('execution:view') %}
                         <a class="nav-link nav-sublink {% if request.path.startswith('/executions/history') or (request.path.startswith('/executions/') and not request.path.startswith('/executions/run')) %}active{% endif %}" href="{{ url_for('execution.history_page') }}">执行历史</a>
+                        {% endif %}
+                        {% if has_permission('report:view') %}
                         <a class="nav-link nav-sublink {% if request.path.startswith('/reports') %}active{% endif %}" href="{{ url_for('report.list_reports') }}">测试报告</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
+            {% endif %}
+
+            {% if has_permission('user:manage') or has_permission('role:manage') or has_permission('project_member:manage') or has_permission('audit:view') %}
+            <div class="nav-group">
+                <button class="nav-link nav-group-toggle {% if admin_active %}active{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#groupAdmin" aria-expanded="{{ 'true' if admin_active else 'false' }}">
+                    权限管理
+                </button>
+                <div class="collapse {% if admin_active %}show{% endif %}" id="groupAdmin">
+                    <div class="nav flex-column nav-group-menu">
+                        {% if has_permission('user:manage') %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/users') %}active{% endif %}" href="{{ url_for('admin.users_page') }}">用户管理</a>
+                        {% endif %}
+                        {% if has_permission('role:manage') %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/roles') %}active{% endif %}" href="{{ url_for('admin.roles_page') }}">角色管理</a>
+                        {% endif %}
+                        {% if has_permission('project_member:manage') %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/projects') %}active{% endif %}" href="{{ url_for('admin.projects_page') }}">项目成员</a>
+                        {% endif %}
+                        {% if has_permission('audit:view') %}
+                        <a class="nav-link nav-sublink {% if request.path.startswith('/admin/audit') %}active{% endif %}" href="{{ url_for('admin.audit_page') }}">审计日志</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </nav>
     </aside>
 
@@ -104,9 +224,18 @@
                 <h5 class="mb-0">{% block page_title %}后台管理{% endblock %}</h5>
                 <small class="text-muted">{% block page_desc %}接口自动化测试平台{% endblock %}</small>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 align-items-center">
+                {% if has_permission('testcase:create') %}
                 <a href="{{ url_for('testcase.create_testcase_page') }}" class="btn btn-sm btn-primary">新建用例</a>
+                {% endif %}
+                {% if has_permission('ai:use') %}
                 <a href="{{ url_for('ai.parser_page') }}" class="btn btn-sm btn-outline-primary">AI 解析</a>
+                {% endif %}
+                {% if current_user %}
+                <form method="post" action="{{ url_for('auth.logout') }}" class="m-0">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">退出登录</button>
+                </form>
+                {% endif %}
             </div>
         </header>
 

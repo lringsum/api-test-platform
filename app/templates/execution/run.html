@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}接口执行{% endblock %}
 {% block page_title %}接口执行{% endblock %}
@@ -44,12 +44,14 @@
             模块选择仅用于执行指定模块，不会影响下方其它模块的展示。
         </div>
 
+        {% if has_permission('execution:run') %}
         <div class="col-12 d-flex gap-2 flex-wrap mb-3">
             <button class="btn btn-success" id="runTestcaseBtn" type="button">执行单用例</button>
             <button class="btn btn-primary" id="runModuleBtn" type="button">执行模块</button>
             <button class="btn btn-warning text-white" id="runProjectBtn" type="button">执行项目</button>
             <a class="btn btn-outline-secondary" href="{{ url_for('execution.history_page') }}">查看执行历史</a>
         </div>
+        {% endif %}
 
         <div id="testcasePanel" class="d-none">
             <div class="col-12">
@@ -60,9 +62,11 @@
                 <div id="selectedTestcaseList" class="border rounded p-2 testcase-checklist bg-light"></div>
                 <div class="form-text">执行单用例：请仅勾选 1 条。执行选中用例：可勾选多条批量执行。</div>
             </div>
+            {% if has_permission('execution:run') %}
             <div class="col-12 d-flex gap-2 flex-wrap mt-2">
                 <button class="btn btn-outline-primary" id="runSelectedBtn" type="button">执行选中用例</button>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -86,7 +90,6 @@ const currentProjectId = {{ current_project_id|tojson }};
     overflow-y: auto;
     overflow-x: hidden;
 }
-
 .testcase-checklist-item {
     display: flex;
     align-items: flex-start;
@@ -94,13 +97,11 @@ const currentProjectId = {{ current_project_id|tojson }};
     margin-left: 0;
     padding-left: 1.75rem !important;
 }
-
 .testcase-checklist-item .testcase-checkbox {
     margin-top: 0.2rem;
     margin-left: -1.25rem;
     flex-shrink: 0;
 }
-
 .testcase-checklist-item .form-check-label {
     flex: 1;
     min-width: 0;
@@ -368,7 +369,6 @@ async function runExecution(url) {
 document.getElementById("searchBtn").addEventListener("click", async function () {
     await loadRunOptions(currentProjectId);
 });
-
 document.getElementById("resetBtn").addEventListener("click", function () {
     fillSelectOptions("environmentId", [], "请选择环境", (item) => `${item.name} - ${item.base_url}`);
     fillSelectOptions("moduleId", [], "全部模块", (item) => item.name);
@@ -378,17 +378,13 @@ document.getElementById("resetBtn").addEventListener("click", function () {
     updateExecutionState();
     showResultText("runResult", "筛选条件已清空");
 });
-
 document.getElementById("environmentId").addEventListener("change", updateExecutionState);
-
 document.getElementById("moduleId").addEventListener("change", updateExecutionState);
-
 document.addEventListener("change", function (event) {
     if (event.target.classList.contains("testcase-checkbox")) {
         updateExecutionState();
     }
 });
-
 document.getElementById("toggleAllVisibleBtn").addEventListener("click", function () {
     const visibleCheckboxes = getVisibleEnabledCheckboxes();
     if (!visibleCheckboxes.length) return;
@@ -398,7 +394,7 @@ document.getElementById("toggleAllVisibleBtn").addEventListener("click", functio
     });
     updateExecutionState();
 });
-
+{% if has_permission('execution:run') %}
 document.getElementById("runTestcaseBtn").addEventListener("click", async function () {
     const testcaseIds = getSelectedValues();
     if (testcaseIds.length !== 1) {
@@ -407,7 +403,6 @@ document.getElementById("runTestcaseBtn").addEventListener("click", async functi
     }
     await runExecution.call(this, `/executions/api/run/testcase/${testcaseIds[0]}`);
 });
-
 document.getElementById("runModuleBtn").addEventListener("click", async function () {
     const moduleId = document.getElementById("moduleId").value;
     if (!moduleId) {
@@ -416,7 +411,6 @@ document.getElementById("runModuleBtn").addEventListener("click", async function
     }
     await runExecution.call(this, `/executions/api/run/module/${moduleId}`);
 });
-
 document.getElementById("runSelectedBtn").addEventListener("click", async function () {
     if (!ensureProjectAndEnvironment()) return;
     const environmentId = document.getElementById("environmentId").value;
@@ -449,7 +443,6 @@ document.getElementById("runSelectedBtn").addEventListener("click", async functi
         updateExecutionState();
     }
 });
-
 document.getElementById("runProjectBtn").addEventListener("click", async function () {
     const projectId = currentProjectId;
     if (!projectId) {
@@ -458,6 +451,7 @@ document.getElementById("runProjectBtn").addEventListener("click", async functio
     }
     await runExecution.call(this, `/executions/api/run/project/${projectId}`);
 });
+{% endif %}
 
 if (currentProjectId) {
     loadRunOptions(currentProjectId);
@@ -466,4 +460,3 @@ if (currentProjectId) {
 }
 </script>
 {% endblock %}
-

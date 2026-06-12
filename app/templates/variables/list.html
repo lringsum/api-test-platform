@@ -29,6 +29,7 @@
     </div>
 </div>
 
+{% if has_permission('variable:create') %}
 <div class="card mb-4 page-action-panel">
     <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
         <strong>新增变量</strong>
@@ -63,11 +64,11 @@
                             <option value="{{ env.id }}">{{ env.project.name }} / {{ env.name }}</option>
                             {% endfor %}
                         </select>
-                        <div class="form-text">仅 environment 作用域需要选择环境</div>
+                        <div class="form-text">作用域为 environment 时需要选择环境</div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">变量名</label>
-                        <input class="form-control" name="name" placeholder="如：token">
+                        <input class="form-control" name="name" placeholder="例如：token">
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">变量值</label>
@@ -85,6 +86,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="card">
     <div class="card-header bg-white"><strong>变量列表</strong></div>
@@ -116,13 +118,18 @@
                     <td>{{ item.description }}</td>
                     <td>
                         <div class="d-flex gap-2 mb-2">
+                            {% if has_permission('variable:edit') %}
                             <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editVar{{ item.id }}">
                                 <i class="bi bi-pencil-square me-1"></i>编辑
                             </button>
+                            {% endif %}
+                            {% if has_permission('variable:delete') %}
                             <form method="post" action="{{ url_for('variable.delete_variable', variable_id=item.id) }}" onsubmit="return confirm('确认删除该变量吗？');">
                                 <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>删除</button>
                             </form>
+                            {% endif %}
                         </div>
+                        {% if has_permission('variable:edit') %}
                         <div class="collapse" id="editVar{{ item.id }}">
                             <div class="card card-body bg-light">
                                 <form method="post" action="{{ url_for('variable.edit_variable', variable_id=item.id) }}" class="row g-2">
@@ -162,6 +169,7 @@
                                 </form>
                             </div>
                         </div>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -188,10 +196,12 @@ function toggleEnvironmentSelect(scopeEl, envEl) {
 
 const createScope = document.getElementById("createScope");
 const createEnv = document.getElementById("createEnvironmentId");
-toggleEnvironmentSelect(createScope, createEnv);
-createScope?.addEventListener("change", function () {
+if (createScope && createEnv) {
     toggleEnvironmentSelect(createScope, createEnv);
-});
+    createScope.addEventListener("change", function () {
+        toggleEnvironmentSelect(createScope, createEnv);
+    });
+}
 
 document.querySelectorAll(".edit-scope").forEach(function (scopeEl) {
     const targetId = scopeEl.getAttribute("data-target");
@@ -203,4 +213,3 @@ document.querySelectorAll(".edit-scope").forEach(function (scopeEl) {
 });
 </script>
 {% endblock %}
-

@@ -9,11 +9,13 @@ from app.services.project_service import ProjectService
 from app.services.scenario_service import ScenarioService
 from app.services.testcase_service import TestCaseService
 from app.project_context import resolve_project_id
+from app.security import accessible_project_ids, accessible_projects, require_permission
 
 scenario_bp = Blueprint("scenario", __name__, url_prefix="/scenarios")
 
 
 @scenario_bp.route("/")
+@require_permission("scenario:view")
 def list_scenarios():
     project_id = resolve_project_id()
     module_id = request.args.get("module_id", type=int)
@@ -26,10 +28,11 @@ def list_scenarios():
         status=status or None,
         keyword=keyword or None,
     )
-    projects = ProjectService.list_all()
+    projects = accessible_projects()
     modules = ModuleService.list_all(project_id=project_id) if project_id else []
-    all_modules = ModuleService.list_all()
-    all_environments = EnvironmentService.list_all()
+    project_ids = accessible_project_ids()
+    all_modules = [module for module in ModuleService.list_all() if module.project_id in project_ids] if project_ids else []
+    all_environments = [env for env in EnvironmentService.list_all() if env.project_id in project_ids] if project_ids else []
 
     return render_template(
         "scenarios/list.html",
@@ -46,6 +49,7 @@ def list_scenarios():
 
 
 @scenario_bp.route("/create", methods=["POST"])
+@require_permission("scenario:create")
 def create_scenario():
     try:
         scenario = ScenarioService.create(
@@ -63,9 +67,10 @@ def create_scenario():
 
 
 @scenario_bp.route("/<int:scenario_id>/edit")
+@require_permission("scenario:edit")
 def edit_scenario_page(scenario_id):
     scenario = ScenarioService.get_by_id(scenario_id)
-    projects = ProjectService.list_all()
+    projects = accessible_projects()
     modules = ModuleService.list_all(project_id=scenario.project_id)
     testcases = TestCaseService.list_all(project_id=scenario.project_id)
     environments = EnvironmentService.list_all(project_id=scenario.project_id)
@@ -81,6 +86,7 @@ def edit_scenario_page(scenario_id):
 
 
 @scenario_bp.route("/<int:scenario_id>/edit", methods=["POST"])
+@require_permission("scenario:edit")
 def edit_scenario(scenario_id):
     try:
         ScenarioService.update(
@@ -98,6 +104,7 @@ def edit_scenario(scenario_id):
 
 
 @scenario_bp.route("/<int:scenario_id>/delete", methods=["POST"])
+@require_permission("scenario:delete")
 def delete_scenario(scenario_id):
     try:
         ScenarioService.delete(scenario_id)
@@ -108,6 +115,7 @@ def delete_scenario(scenario_id):
 
 
 @scenario_bp.route("/<int:scenario_id>/run", methods=["POST"])
+@require_permission("scenario:run")
 def run_scenario(scenario_id):
     try:
         execution = ScenarioExecutionService.run_scenario(
@@ -126,6 +134,7 @@ def run_scenario(scenario_id):
 
 
 @scenario_bp.route("/<int:scenario_id>/steps/create", methods=["POST"])
+@require_permission("scenario:edit")
 def create_scenario_step(scenario_id):
     try:
         ScenarioService.add_step(
@@ -146,6 +155,7 @@ def create_scenario_step(scenario_id):
 
 
 @scenario_bp.route("/steps/<int:scenario_step_id>/edit", methods=["POST"])
+@require_permission("scenario:edit")
 def edit_scenario_step(scenario_step_id):
     try:
         step = ScenarioService.get_step_by_id(scenario_step_id)
@@ -168,6 +178,7 @@ def edit_scenario_step(scenario_step_id):
 
 
 @scenario_bp.route("/steps/<int:scenario_step_id>/delete", methods=["POST"])
+@require_permission("scenario:edit")
 def delete_scenario_step(scenario_step_id):
     try:
         step = ScenarioService.get_step_by_id(scenario_step_id)
@@ -181,6 +192,7 @@ def delete_scenario_step(scenario_step_id):
 
 
 @scenario_bp.route("/steps/<int:scenario_step_id>/move-up", methods=["POST"])
+@require_permission("scenario:edit")
 def move_scenario_step_up(scenario_step_id):
     try:
         step = ScenarioService.get_step_by_id(scenario_step_id)
@@ -193,6 +205,7 @@ def move_scenario_step_up(scenario_step_id):
 
 
 @scenario_bp.route("/steps/<int:scenario_step_id>/move-down", methods=["POST"])
+@require_permission("scenario:edit")
 def move_scenario_step_down(scenario_step_id):
     try:
         step = ScenarioService.get_step_by_id(scenario_step_id)
@@ -205,6 +218,7 @@ def move_scenario_step_down(scenario_step_id):
 
 
 @scenario_bp.route("/executions/history")
+@require_permission("scenario:view")
 def scenario_execution_history():
     project_id = resolve_project_id()
     scenario_id = request.args.get("scenario_id", type=int)
@@ -220,7 +234,7 @@ def scenario_execution_history():
         page=page,
         per_page=20
     )
-    projects = ProjectService.list_all()
+    projects = accessible_projects()
     scenarios = ScenarioService.list_all(project_id=project_id) if project_id else []
     environments = EnvironmentService.list_all(project_id=project_id) if project_id else []
     return render_template(
@@ -237,12 +251,14 @@ def scenario_execution_history():
 
 
 @scenario_bp.route("/executions/<int:scenario_execution_id>")
+@require_permission("scenario:view")
 def scenario_execution_detail(scenario_execution_id):
     execution = ScenarioExecutionService.get_execution_by_id(scenario_execution_id)
     return render_template("scenarios/detail.html", execution=execution)
 
 
 @scenario_bp.route("/executions/<int:scenario_execution_id>/rerun", methods=["POST"])
+@require_permission("scenario:run")
 def rerun_scenario_execution(scenario_execution_id):
     try:
         execution = ScenarioExecutionService.rerun(

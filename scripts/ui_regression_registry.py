@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+﻿from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,7 @@ PAGE_REGISTRY = [
         module="dashboard",
         path="/",
         page_title="Dashboard",
-        ready_markers=("统计筛选",),
+        ready_markers=("项目数量",),
     ),
     PageSpec(
         name="projects",
@@ -83,6 +83,34 @@ PAGE_REGISTRY = [
         ready_markers=("执行记录",),
     ),
     PageSpec(
+        name="ui-scripts",
+        module="ui-automation",
+        path="/ui-automation/scripts",
+        page_title="UI 脚本管理",
+        ready_markers=("aiScriptDrawer", "scriptDetailDrawer"),
+    ),
+    PageSpec(
+        name="ui-locators",
+        module="ui-automation",
+        path="/ui-automation/locators",
+        page_title="UI 定位器库",
+        ready_markers=("筛选条件", "定位器列表", "定位器管理洞察"),
+    ),
+    PageSpec(
+        name="ui-executions",
+        module="ui-automation",
+        path="/ui-automation/executions",
+        page_title="UI 执行计划",
+        ready_markers=("执行配置", "Playwright Worker 已接入"),
+    ),
+    PageSpec(
+        name="ui-replays",
+        module="ui-automation",
+        path="/ui-automation/replays",
+        page_title="UI 报告回放",
+        ready_markers=("uiReplayPage", "replayFilterForm"),
+    ),
+    PageSpec(
         name="reports",
         module="report",
         path="/reports/",
@@ -116,6 +144,60 @@ BROWSER_SCENARIOS = [
         "kind": "anomaly",
         "project_id": 999999,
         "expected_empty": True,
+    },
+    {
+        "name": "execution_report_smoke",
+        "module": "execution",
+        "kind": "smoke",
+    },
+    {
+        "name": "ui_locator_smoke",
+        "module": "ui-automation",
+        "kind": "smoke",
+        "project_id": 4,
+        "other_project_id": 3,
+    },
+    {
+        "name": "ui_worker_smoke",
+        "module": "ui-automation",
+        "kind": "smoke",
+        "project_id": 4,
+    },
+    {
+        "name": "ui_script_ai_generate_smoke",
+        "module": "ui-automation",
+        "kind": "smoke",
+        "project_id": 4,
+    },
+    {
+        "name": "ui_script_version_history_smoke",
+        "module": "ui-automation",
+        "kind": "smoke",
+        "project_id": 4,
+    },
+    {
+        "name": "ui_replay_smoke",
+        "module": "ui-automation",
+        "kind": "smoke",
+        "project_id": 4,
+    },
+    {
+        "name": "ui_script_repair_smoke",
+        "module": "ui-automation",
+        "kind": "smoke",
+        "project_id": 4,
+    },
+    {
+        "name": "ui_script_batch_smoke",
+        "module": "ui-automation",
+        "kind": "smoke",
+        "project_id": 4,
+    },
+    {
+        "name": "ui_script_detail_smoke",
+        "module": "ui-automation",
+        "kind": "smoke",
+        "project_id": 4,
     },
 ]
 

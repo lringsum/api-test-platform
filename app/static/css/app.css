@@ -21,6 +21,54 @@
     height: 100vh;
 }
 
+.sidebar {
+    background: linear-gradient(180deg, #fbfcff 0%, #eef3fb 100%);
+    color: #0f172a;
+    border-right: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.sidebar .sidebar-brand h4,
+.sidebar .sidebar-brand small,
+.sidebar .sidebar-project-label,
+.sidebar .nav-group-toggle,
+.sidebar .nav-link,
+.sidebar .nav-sublink {
+    color: #0f172a;
+}
+
+.sidebar .sidebar-brand small {
+    color: #64748b !important;
+}
+
+.sidebar .sidebar-project-card {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.sidebar .sidebar-project-select {
+    background: #fff;
+    color: #0f172a;
+}
+
+.sidebar .nav-group-toggle,
+.sidebar .nav-link,
+.sidebar .nav-sublink {
+    border-radius: 10px;
+}
+
+.sidebar .nav-group-toggle:hover,
+.sidebar .nav-link:hover,
+.sidebar .nav-sublink:hover,
+.sidebar .nav-link.active,
+.sidebar .nav-sublink.active {
+    background: rgba(13, 110, 253, 0.08);
+    color: #0b5ed7;
+}
+
+.sidebar .nav-group-toggle::after {
+    color: #64748b;
+}
+
 .sidebar-brand {
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
     padding-bottom: 16px;
@@ -1985,10 +2033,10 @@ body::before {
     color: #374151;
 }
 
-/* Sidebar final override - keep navigation readable on dark shell */
+/* Sidebar final override - light shell and clear hierarchy */
 .sidebar {
-    background: linear-gradient(180deg, #0b1220 0%, #111827 100%) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+    background: linear-gradient(180deg, #fbfcff 0%, #eef3fb 100%) !important;
+    border-right: 1px solid rgba(148, 163, 184, 0.22) !important;
 }
 
 .sidebar .sidebar-brand h4,
@@ -1997,22 +2045,22 @@ body::before {
 .sidebar .nav-group-toggle,
 .sidebar .nav-link,
 .sidebar .nav-sublink {
-    color: rgba(255, 255, 255, 0.90) !important;
+    color: #0f172a !important;
 }
 
 .sidebar .sidebar-brand small {
-    color: rgba(255, 255, 255, 0.56) !important;
+    color: #64748b !important;
 }
 
 .sidebar .sidebar-project-card {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    border-color: rgba(148, 163, 184, 0.2) !important;
 }
 
 .sidebar .sidebar-project-select {
     background: #ffffff !important;
     color: #111827 !important;
-    border-color: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(148, 163, 184, 0.22) !important;
 }
 
 .sidebar .nav-group-toggle,
@@ -2024,19 +2072,123 @@ body::before {
     opacity: 1 !important;
 }
 
+.sidebar .nav-group {
+    margin-bottom: 8px;
+}
+
+.sidebar .nav-group-toggle {
+    font-size: 0.99rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    padding: 0.95rem 1rem;
+    line-height: 1.15;
+    border-radius: 14px;
+    background: rgba(37, 99, 235, 0.02) !important;
+}
+
+.sidebar .nav-sublink {
+    font-size: 0.84rem;
+    font-weight: 500;
+    padding: 0.56rem 0.9rem 0.56rem 1.7rem;
+    margin-left: 0.5rem;
+    line-height: 1.2;
+    color: rgba(15, 23, 42, 0.66) !important;
+    position: relative;
+    border-radius: 12px;
+}
+
+.sidebar .nav-sublink::before {
+    content: "";
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    transform: translateY(-50%);
+    background: rgba(100, 116, 139, 0.55);
+}
+
 .sidebar .nav-group-toggle:hover,
 .sidebar .nav-link:hover,
 .sidebar .nav-sublink:hover,
 .sidebar .nav-link.active,
 .sidebar .nav-sublink.active {
-    color: #ffffff !important;
-    background: rgba(59, 130, 246, 0.18) !important;
-    border-color: rgba(96, 165, 250, 0.25) !important;
-    box-shadow: inset 3px 0 0 #60a5fa !important;
+    color: #0b5ed7 !important;
+    background: rgba(13, 110, 253, 0.08) !important;
+    border-color: rgba(13, 110, 253, 0.14) !important;
+    box-shadow: inset 3px 0 0 #2563eb !important;
+}
+
+.sidebar .nav-sublink.active::before,
+.sidebar .nav-sublink:hover::before {
+    background: #2563eb;
+}
+
+/* Compact backend density sync */
+.content-area {
+    padding: 16px 18px 22px !important;
+}
+
+.topbar {
+    padding: 12px 18px !important;
+}
+
+.card {
+    border-radius: 18px !important;
+}
+
+.card-header,
+.card-header.bg-white {
+    padding: 0.8rem 1rem !important;
+}
+
+.card-body {
+    padding: 1rem !important;
+}
+
+.page-action-panel {
+    margin-bottom: 1rem !important;
+}
+
+.page-action-panel-header,
+.page-action-panel .card-header {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+}
+
+.page-action-panel-body {
+    padding: 0.95rem !important;
+}
+
+.table > :not(caption) > * > * {
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.65rem !important;
+}
+
+.table thead th {
+    font-size: 0.72rem !important;
+    letter-spacing: 0.06em !important;
+}
+
+.table-responsive {
+    border-radius: 18px !important;
+}
+
+.page-action-panel .form-control,
+.page-action-panel .form-select,
+.card .form-control,
+.card .form-select {
+    min-height: 40px;
+}
+
+.page-action-panel .btn,
+.card .btn {
+    min-height: 40px;
 }
 
 .sidebar .nav-group-toggle::after {
-    color: rgba(255, 255, 255, 0.58) !important;
+    color: #64748b !important;
 }
 
 /* Final UI polish */
@@ -2270,10 +2422,10 @@ body::before {
     box-shadow: none;
 }
 
-/* Sidebar final override - keep navigation readable on dark shell */
+/* Sidebar final override - light shell and clear hierarchy */
 .sidebar {
-    background: linear-gradient(180deg, #0b1220 0%, #111827 100%) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+    background: linear-gradient(180deg, #fbfcff 0%, #eef3fb 100%) !important;
+    border-right: 1px solid rgba(148, 163, 184, 0.22) !important;
 }
 
 .sidebar .sidebar-brand h4,
@@ -2282,22 +2434,22 @@ body::before {
 .sidebar .nav-group-toggle,
 .sidebar .nav-link,
 .sidebar .nav-sublink {
-    color: rgba(255, 255, 255, 0.90) !important;
+    color: #0f172a !important;
 }
 
 .sidebar .sidebar-brand small {
-    color: rgba(255, 255, 255, 0.56) !important;
+    color: #64748b !important;
 }
 
 .sidebar .sidebar-project-card {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    border-color: rgba(148, 163, 184, 0.2) !important;
 }
 
 .sidebar .sidebar-project-select {
     background: #ffffff !important;
     color: #111827 !important;
-    border-color: rgba(255, 255, 255, 0.10) !important;
+    border-color: rgba(148, 163, 184, 0.22) !important;
 }
 
 .sidebar .nav-group-toggle,
@@ -2309,19 +2461,61 @@ body::before {
     opacity: 1 !important;
 }
 
+.sidebar .nav-group {
+    margin-bottom: 8px;
+}
+
+.sidebar .nav-group-toggle {
+    font-size: 0.99rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    padding: 0.95rem 1rem;
+    line-height: 1.15;
+    border-radius: 14px;
+    background: rgba(37, 99, 235, 0.02) !important;
+}
+
+.sidebar .nav-sublink {
+    font-size: 0.84rem;
+    font-weight: 500;
+    padding: 0.56rem 0.9rem 0.56rem 1.7rem;
+    margin-left: 0.5rem;
+    line-height: 1.2;
+    color: rgba(15, 23, 42, 0.66) !important;
+    position: relative;
+    border-radius: 12px;
+}
+
+.sidebar .nav-sublink::before {
+    content: "";
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 999px;
+    transform: translateY(-50%);
+    background: rgba(100, 116, 139, 0.55);
+}
+
 .sidebar .nav-group-toggle:hover,
 .sidebar .nav-link:hover,
 .sidebar .nav-sublink:hover,
 .sidebar .nav-link.active,
 .sidebar .nav-sublink.active {
-    color: #ffffff !important;
-    background: rgba(59, 130, 246, 0.18) !important;
-    border-color: rgba(96, 165, 250, 0.25) !important;
-    box-shadow: inset 3px 0 0 #60a5fa !important;
+    color: #0b5ed7 !important;
+    background: rgba(13, 110, 253, 0.08) !important;
+    border-color: rgba(13, 110, 253, 0.14) !important;
+    box-shadow: inset 3px 0 0 #2563eb !important;
 }
 
 .sidebar .nav-group-toggle::after {
-    color: rgba(255, 255, 255, 0.58) !important;
+    color: #64748b !important;
+}
+
+.sidebar .nav-sublink.active::before,
+.sidebar .nav-sublink:hover::before {
+    background: #2563eb;
 }
 
 

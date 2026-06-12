@@ -37,7 +37,7 @@
                     <td>{{ item.data.total_duration_ms if item.data.total_duration_ms is not none else '-' }}</td>
                     <td>{{ item.created_at | bjt }}</td>
                     <td class="d-flex gap-2">
-                        <a class="btn btn-sm btn-outline-success" href="{{ url_for('report.detail_report', report_id=item.id) }}"><i class="bi bi-bar-chart-fill me-1"></i>查看</a>
+                        <a class="btn btn-sm btn-outline-success" href="{{ url_for('report.detail_report', report_id=item.id) }}"><i class="bi bi-bar-chart-fill me-1"></i>回放</a>
                     </td>
                 </tr>
                 {% endfor %}

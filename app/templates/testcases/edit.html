@@ -19,9 +19,7 @@
                         <option value="{{ project.id }}" {% if testcase and testcase.project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
                         {% endfor %}
                     </select>
-                    {% if testcase %}
-                    <input type="hidden" name="project_id" value="{{ testcase.project_id }}">
-                    {% endif %}
+                    {% if testcase %}<input type="hidden" name="project_id" value="{{ testcase.project_id }}">{% endif %}
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">所属模块</label>
@@ -57,7 +55,7 @@
                     <div class="card border mb-3">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <strong>前置脚本</strong>
-                            <small class="text-muted">发送请求前执行，可生成 sign、time、nonce 等动态参数</small>
+                            <small class="text-muted">可在发送请求前执行脚本</small>
                         </div>
                         <div class="card-body">
                             <div class="row g-3">
@@ -72,25 +70,15 @@
                                     <label class="form-label">脚本语言</label>
                                     <input class="form-control" id="preScriptLanguage" value="python" readonly>
                                 </div>
+                                {% if has_permission('testcase:edit') %}
                                 <div class="col-md-6 d-flex align-items-end gap-2">
                                     <button class="btn btn-outline-primary btn-sm" type="button" id="syncPreScriptBtn">同步脚本到 JSON</button>
                                     <button class="btn btn-outline-secondary btn-sm" type="button" id="fillPreScriptExampleBtn">填入示例</button>
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label">常用示例</label>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button class="btn btn-outline-secondary btn-sm pre-script-example-btn" type="button" data-example-key="sign">签名示例</button>
-                                        <button class="btn btn-outline-secondary btn-sm pre-script-example-btn" type="button" data-example-key="nonce">Nonce 示例</button>
-                                        <button class="btn btn-outline-secondary btn-sm pre-script-example-btn" type="button" data-example-key="auth_header">鉴权 Header 示例</button>
-                                    </div>
-                                </div>
+                                {% endif %}
                                 <div class="col-12">
                                     <label class="form-label">脚本内容</label>
                                     <textarea class="form-control json-textarea" id="preScriptContent" placeholder='例如：body["time"] = str(timestamp())'></textarea>
-                                    <div class="form-text">
-                                        可用对象：<code>env</code>、<code>project_vars</code>、<code>runtime_vars</code>、<code>headers</code>、<code>params</code>、<code>body</code>；
-                                        可用函数：<code>md5(str)</code>, <code>sha256(str)</code>, <code>timestamp()</code>, <code>uuid4()</code>, <code>base64_encode(str)</code>, <code>url_encode(str)</code>, <code>json_dumps_compact(obj)</code>。
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -99,14 +87,16 @@
                     <div class="mb-3">
                         <label class="form-label d-flex justify-content-between">
                             <span>用例 JSON</span>
-                            <small class="text-muted fw-normal">必须符合标准结构，支持 'status_code', 'json_path', 'contains', 'response_time' 断言。</small>
+                            <small class="text-muted fw-normal">必须符合标准结构</small>
                         </label>
                         <textarea class="form-control json-textarea-lg" id="caseDataTextarea" name="case_data">{{ case_json }}</textarea>
                     </div>
                 </div>
                 <div class="col-12 d-flex gap-2">
+                    {% if has_permission('testcase:edit') %}
                     <button class="btn btn-success" type="submit">保存用例</button>
                     <button class="btn btn-outline-primary" type="button" id="validateCaseBtn">校验 JSON</button>
+                    {% endif %}
                     <a class="btn btn-outline-secondary" href="{{ url_for('testcase.list_testcases') }}">返回列表</a>
                 </div>
             </div>
@@ -139,24 +129,14 @@ const PRE_SCRIPT_EXAMPLES = {
     nonce: 'body["nonce"] = uuid4()\nruntime_vars["nonce"] = body["nonce"]',
     auth_header: 'runtime_vars["access_token"] = env["access_token"]\nheaders["Authorization"] = "Bearer " + runtime_vars["access_token"]'
 };
-
 function showResultHtml(elementId, htmlContent) {
     const el = document.getElementById(elementId);
-    if (el) {
-        el.innerHTML = htmlContent;
-    }
+    if (el) el.innerHTML = htmlContent;
 }
-
 function normalizePreScript(preScript) {
     const config = preScript && typeof preScript === "object" ? preScript : {};
-    return {
-        enabled: Boolean(config.enabled),
-        language: config.language || "python",
-        template_id: config.template_id || null,
-        content: config.content || ""
-    };
+    return { enabled: Boolean(config.enabled), language: config.language || "python", template_id: config.template_id || null, content: config.content || "" };
 }
-
 function loadPreScriptFromJson() {
     try {
         const caseJson = JSON.parse(caseDataTextarea.value || "{}");
@@ -170,7 +150,6 @@ function loadPreScriptFromJson() {
         preScriptContent.value = "";
     }
 }
-
 function syncPreScriptToJson() {
     let caseJson;
     try {
@@ -179,100 +158,35 @@ function syncPreScriptToJson() {
         showResultHtml("validateResult", `<div class="text-danger"><i class="bi bi-x-circle-fill me-2"></i>当前用例 JSON 不是合法格式，无法同步前置脚本。</div>`);
         return false;
     }
-
-    caseJson.pre_script = {
-        enabled: preScriptEnabled.value === "1",
-        language: preScriptLanguage.value || "python",
-        template_id: null,
-        content: preScriptContent.value
-    };
-
+    caseJson.pre_script = { enabled: preScriptEnabled.value === "1", language: preScriptLanguage.value || "python", template_id: null, content: preScriptContent.value };
     caseDataTextarea.value = JSON.stringify(caseJson, null, 2);
     return true;
 }
-
+{% if has_permission('testcase:edit') %}
 document.getElementById("syncPreScriptBtn").addEventListener("click", function () {
     if (syncPreScriptToJson()) {
-        showResultHtml("validateResult", `<div class="text-success"><i class="bi bi-check-circle-fill me-2"></i>前置脚本已同步到用例 JSON。请点击“校验 JSON”查看详情。</div>`);
+        showResultHtml("validateResult", `<div class="text-success"><i class="bi bi-check-circle-fill me-2"></i>前置脚本已同步到用例 JSON。</div>`);
     }
 });
-
 document.getElementById("fillPreScriptExampleBtn").addEventListener("click", function () {
     preScriptEnabled.value = "1";
     preScriptContent.value = PRE_SCRIPT_EXAMPLES.sign;
     syncPreScriptToJson();
-    showResultHtml("validateResult", `<div class="text-success"><i class="bi bi-info-circle-fill me-2"></i>已填入前置脚本示例，并同步到用例 JSON。请点击“校验 JSON”查看详情。</div>`);
+    showResultHtml("validateResult", `<div class="text-success"><i class="bi bi-info-circle-fill me-2"></i>已填入前置脚本示例。</div>`);
 });
-
-document.querySelectorAll(".pre-script-example-btn").forEach(function (button) {
-    button.addEventListener("click", function () {
-        const exampleKey = button.dataset.exampleKey;
-        preScriptEnabled.value = "1";
-        preScriptContent.value = PRE_SCRIPT_EXAMPLES[exampleKey] || PRE_SCRIPT_EXAMPLES.sign;
-        syncPreScriptToJson();
-        showResultHtml("validateResult", `<div class="text-success"><i class="bi bi-info-circle-fill me-2"></i>已切换前置脚本示例，并同步到用例 JSON。请点击“校验 JSON”查看详情。</div>`);
-    });
-});
-
 document.getElementById("validateCaseBtn").addEventListener("click", async function () {
-    if (!syncPreScriptToJson()) {
-        return;
-    }
-
-    const caseData = caseDataTextarea.value;
+    if (!syncPreScriptToJson()) return;
     try {
-        const result = await postJson("{{ url_for('testcase.validate_case_json') }}", {
-            case_data: caseData
-        });
-        
-        let displayHtml = `<div class="text-success mb-3"><i class="bi bi-check-circle-fill me-2"></i>校验通过！</div>`;
-        
-        // 尝试解析 JSON 来展示漂亮的信息块
-        try {
-            const parsedData = JSON.parse(caseData);
-            
-            // 提取规则展示
-            if (parsedData.extract && Object.keys(parsedData.extract).length > 0) {
-                displayHtml += `<div class="card mb-3 border-info">
-                    <div class="card-header bg-info text-white py-1"><i class="bi bi-box-arrow-right me-2"></i>提取规则 (Extract)</div>
-                    <div class="card-body py-2"><pre class="mb-0"><code>${JSON.stringify(parsedData.extract, null, 2)}</code></pre></div>
-                </div>`;
-            }
-            
-            // 断言规则展示
-            if (parsedData.assertions && parsedData.assertions.length > 0) {
-                displayHtml += `<div class="card mb-3 border-success">
-                    <div class="card-header bg-success text-white py-1"><i class="bi bi-shield-check me-2"></i>断言规则 (Assertions)</div>
-                    <div class="card-body py-2"><pre class="mb-0"><code>${JSON.stringify(parsedData.assertions, null, 2)}</code></pre></div>
-                </div>`;
-            }
-            
-            // 前置脚本展示
-            if (parsedData.pre_script && parsedData.pre_script.enabled && parsedData.pre_script.content) {
-                displayHtml += `<div class="card mb-3 border-warning">
-                    <div class="card-header bg-warning text-dark py-1"><i class="bi bi-file-earmark-code me-2"></i>前置脚本 (Pre-script)</div>
-                    <div class="card-body py-2"><pre class="mb-0"><code>${parsedData.pre_script.content}</code></pre></div>
-                </div>`;
-            }
-            
-            displayHtml += `<div class="mt-4"><strong class="text-secondary"><i class="bi bi-filetype-json me-2"></i>完整格式化 JSON：</strong><pre class="mt-2 p-3 bg-dark text-light rounded" style="font-family: monospace; font-size: 0.9em; white-space: pre-wrap; word-break: break-all;"><code>${JSON.stringify(parsedData, null, 2)}</code></pre></div>`;
-            
-            validateResult.innerHTML = displayHtml;
-        } catch (e) {
-            // 解析失败退级显示文本
-             showResultHtml("validateResult", `<div class="text-success"><i class="bi bi-check-circle-fill me-2"></i>校验通过！</div><pre class="mt-2 p-3 bg-light rounded"><code>${result.data}</code></pre>`);
-         }
-     } catch (error) {
-        validateResult.innerHTML = `<div class="text-danger"><i class="bi bi-x-circle-fill me-2"></i>校验失败：${error.message}</div>`;
+        const result = await postJson("{{ url_for('testcase.validate_case_json') }}", { case_data: caseDataTextarea.value });
+        showResultHtml("validateResult", `<div class="text-success mb-3"><i class="bi bi-check-circle-fill me-2"></i>校验通过</div><pre class="mt-2 p-3 bg-light rounded"><code>${JSON.stringify(result.data, null, 2)}</code></pre>`);
+    } catch (error) {
+        showResultHtml("validateResult", `<div class="text-danger"><i class="bi bi-x-circle-fill me-2"></i>校验失败：${error.message}</div>`);
     }
 });
-
 testcaseForm.addEventListener("submit", function (event) {
-    if (!syncPreScriptToJson()) {
-        event.preventDefault();
-    }
+    if (!syncPreScriptToJson()) event.preventDefault();
 });
-
+{% endif %}
 loadPreScriptFromJson();
 </script>
 {% endblock %}

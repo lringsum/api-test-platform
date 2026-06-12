@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}UI 报告回放{% endblock %}
+{% block page_title %}UI 报告回放{% endblock %}
+{% block page_desc %}查看 UI 自动化执行结果、日志、截图、Trace 和视频，快速定位失败原因。{% endblock %}
+
+{% block content %}
+<div class="page-action-panel mb-4 p-4" id="uiReplayPage">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <div class="text-uppercase text-muted small fw-semibold mb-2">UI Automation Replay</div>
+            <h4 class="mb-2">报告回放</h4>
+            <p class="text-muted mb-0">把每次 UI 自动化执行的结果、产物和关键日志集中到一个页面里，方便快速回看和定位问题。</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_for('ui_auto.index') }}" class="btn btn-outline-secondary btn-sm">返回总览</a>
+            <a href="{{ url_for('execution.history_page') }}" class="btn btn-outline-primary btn-sm">执行历史</a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card h-100">
+            <div class="stat-label">回放总数</div>
+            <div class="stat-value">{{ stats.total }}</div>
+            <div class="text-muted small mt-2">当前项目可见的 UI 自动化执行记录</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card h-100">
+            <div class="stat-label">成功回放</div>
+            <div class="stat-value text-success">{{ stats.passed }}</div>
+            <div class="text-muted small mt-2">执行成功并留下完整产物的记录</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card h-100">
+            <div class="stat-label">失败回放</div>
+            <div class="stat-value text-danger">{{ stats.failed }}</div>
+            <div class="text-muted small mt-2">可直接进入详情查看日志和截图</div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card h-100">
+            <div class="stat-label">产物总数</div>
+            <div class="stat-value">{{ stats.artifacts }}</div>
+            <div class="text-muted small mt-2">日志、截图、视频、Trace 等文件</div>
+        </div>
+    </div>
+</div>
+
+<div class="data-card mb-4">
+    <div class="data-card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <h5 class="mb-1">筛选条件</h5>
+            <p class="text-muted mb-0">按脚本、状态、浏览器快速找到想看的回放。</p>
+        </div>
+        <div class="text-muted small">支持关键字、状态和浏览器类型筛选</div>
+    </div>
+    <div class="p-4">
+        <form id="replayFilterForm" method="get" action="{{ url_for('ui_auto.replays_page') }}">
+            {% if selected_project_id %}
+            <input type="hidden" name="project_id" value="{{ selected_project_id }}">
+            {% endif %}
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-4">
+                    <label class="form-label">关键词</label>
+                    <input class="form-control" name="keyword" value="{{ keyword }}" placeholder="脚本名称、编码、环境、错误信息">
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="queued" {% if selected_status == 'queued' %}selected{% endif %}>排队中</option>
+                        <option value="running" {% if selected_status == 'running' %}selected{% endif %}>执行中</option>
+                        <option value="passed" {% if selected_status == 'passed' %}selected{% endif %}>成功</option>
+                        <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>失败</option>
+                        <option value="timeout" {% if selected_status == 'timeout' %}selected{% endif %}>超时</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <label class="form-label">浏览器</label>
+                    <select class="form-select" name="browser_type">
+                        <option value="">全部浏览器</option>
+                        <option value="chromium" {% if selected_browser_type == 'chromium' %}selected{% endif %}>Chromium</option>
+                        <option value="chrome" {% if selected_browser_type == 'chrome' %}selected{% endif %}>Chrome</option>
+                        <option value="firefox" {% if selected_browser_type == 'firefox' %}selected{% endif %}>Firefox</option>
+                        <option value="webkit" {% if selected_browser_type == 'webkit' %}selected{% endif %}>WebKit</option>
+                    </select>
+                </div>
+                <div class="col-lg-4 col-md-4 d-flex gap-2">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('ui_auto.replays_page') }}" title="重置"><i class="bi bi-eraser"></i></a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if active_filters %}
+<div class="mb-4 px-1">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <span class="text-muted small fw-semibold">当前筛选</span>
+        {% for item in active_filters %}
+        <span class="badge text-bg-light border">{{ item }}</span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="data-card">
+    <div class="data-card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <h5 class="mb-1">回放列表</h5>
+            <p class="text-muted mb-0">点击详情即可查看日志、截图、Trace 和视频产物。</p>
+        </div>
+        <div class="text-muted small">当前筛选结果 {{ runs|length }} 条</div>
+    </div>
+    <div class="p-0">
+        {% if runs %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 10%;">状态</th>
+                        <th style="width: 22%;">脚本</th>
+                        <th style="width: 20%;">环境</th>
+                        <th style="width: 10%;">浏览器</th>
+                        <th style="width: 10%;">模式</th>
+                        <th style="width: 10%;">产物</th>
+                        <th style="width: 12%;">时间</th>
+                        <th style="width: 16%;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in runs %}
+                    {% set run = row.run %}
+                    <tr>
+                        <td>
+                            {% if run.status == 'passed' %}
+                            <span class="badge bg-success">成功</span>
+                            {% elif run.status == 'failed' %}
+                            <span class="badge bg-danger">失败</span>
+                            {% elif run.status == 'timeout' %}
+                            <span class="badge bg-dark">超时</span>
+                            {% elif run.status == 'running' %}
+                            <span class="badge bg-primary">执行中</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">排队中</span>
+                            {% endif %}
+                            <div class="small text-muted mt-1">#{{ run.id }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ row.script_name or '-' }}</div>
+                            <small class="text-muted">{{ row.script_code or '-' }}{% if row.version_no %} · v{{ row.version_no }}{% endif %}</small>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ row.environment_name or '-' }}</div>
+                            <small class="text-muted text-truncate d-block" style="max-width: 280px;">{{ row.environment_base_url or '' }}</small>
+                        </td>
+                        <td>{{ run.browser_type }}</td>
+                        <td>{{ run.run_mode }}</td>
+                        <td>
+                            <div class="fw-semibold">{{ row.artifact_count }} 个</div>
+                            <small class="text-muted">{{ row.screenshot_count }} 图 / {{ row.trace_count }} Trace / {{ row.video_count }} 视频</small>
+                        </td>
+                        <td>{{ run.created_at|bjt }}</td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('ui_auto.replay_detail_page', run_id=run.id) }}">查看详情</a>
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ui_auto.executions_page', project_id=selected_project_id) if selected_project_id else url_for('ui_auto.executions_page') }}">执行列表</a>
+                                {% if row.log_artifact %}
+                                <a class="btn btn-sm btn-outline-success" href="{{ url_for('ui_auto.download_artifact', run_id=run.id, artifact_id=row.log_artifact.id) }}">日志</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-box m-3">当前没有可回放的 UI 自动化记录，先执行一次脚本即可看到这里的内容。</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

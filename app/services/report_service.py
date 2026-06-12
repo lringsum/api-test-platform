@@ -7,7 +7,7 @@ from app.services.execution_service import ExecutionService
 class ReportService:
     @staticmethod
     def get_by_id(report_id):
-        report = Report.query.get(report_id)
+        report = db.session.get(Report, report_id)
         if not report:
             raise ServiceError("报告不存在。")
         return report

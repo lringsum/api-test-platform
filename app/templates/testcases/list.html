@@ -24,27 +24,15 @@
                 </div>
                 <div class="input-group testcase-filter-group">
                     <span class="input-group-text bg-light text-muted">接口名称</span>
-                    <input
-                        type="text"
-                        class="form-control"
-                        name="interface_name"
-                        value="{{ selected_interface_name|default('', true) }}"
-                        placeholder="输入接口名称"
-                    >
+                    <input type="text" class="form-control" name="interface_name" value="{{ selected_interface_name|default('', true) }}" placeholder="输入接口名称">
                 </div>
                 <div class="input-group testcase-filter-group">
                     <span class="input-group-text bg-light text-muted">接口地址</span>
-                    <input
-                        type="text"
-                        class="form-control"
-                        name="interface_url"
-                        value="{{ selected_interface_url|default('', true) }}"
-                        placeholder="输入接口地址"
-                    >
+                    <input type="text" class="form-control" name="interface_url" value="{{ selected_interface_url|default('', true) }}" placeholder="输入接口地址">
                 </div>
                 <div class="testcase-search-actions">
                     <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
-                    <a class="btn btn-outline-secondary" href="{{ url_for('testcase.list_testcases') }}" title="重置" aria-label="重置"><i class="bi bi-eraser"></i></a>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('testcase.list_testcases') }}" title="重置"><i class="bi bi-eraser"></i></a>
                 </div>
             </div>
         </form>
@@ -62,13 +50,7 @@
                 {% if pagination.items %}
                 <div class="testcase-nav-list">
                     {% for module_item in pagination.items %}
-                    {% set is_active_module = selected_module_id == module_item.module.id %}
-                    <button
-                        type="button"
-                        class="testcase-nav-item {% if is_active_module %}active{% endif %}"
-                        data-module-id="{{ module_item.module.id }}"
-                        aria-pressed="{% if is_active_module %}true{% else %}false{% endif %}"
-                    >
+                    <button type="button" class="testcase-nav-item {% if selected_module_id == module_item.module.id %}active{% endif %}" data-module-id="{{ module_item.module.id }}">
                         <div class="d-flex align-items-center justify-content-between gap-2">
                             <div class="text-truncate testcase-nav-name">{{ module_item.module.name }}</div>
                             <span class="testcase-nav-arrow"><i class="bi bi-chevron-right"></i></span>
@@ -76,11 +58,7 @@
                         <div class="testcase-nav-meta mt-1">
                             <span class="badge rounded-2 text-bg-light testcase-soft-badge">项目：{{ module_item.project.name }}</span>
                             <span class="testcase-nav-subtext">
-                                {% if module_item.displayed_endpoint_count < module_item.total_endpoint_count %}
                                 {{ module_item.displayed_endpoint_count }}/{{ module_item.total_endpoint_count }} 接口，{{ module_item.displayed_testcase_count }}/{{ module_item.total_testcase_count }} 用例
-                                {% else %}
-                                共 {{ module_item.total_endpoint_count }} 个接口，{{ module_item.total_testcase_count }} 个用例
-                                {% endif %}
                             </span>
                         </div>
                     </button>
@@ -97,7 +75,7 @@
         <div class="card testcase-browser-card">
             <div class="card-header bg-white d-flex justify-content-between align-items-center testcase-panel-header">
                 <strong class="testcase-section-title">用例列表</strong>
-                <small class="testcase-section-desc">同一接口下的用例合并展示，点击右侧箭头展开详情</small>
+                <small class="testcase-section-desc">点击右侧箭头展开详情</small>
             </div>
             <div class="card-body testcase-panel-body">
                 {% if pagination.items %}
@@ -106,24 +84,13 @@
                     <div class="testcase-module-card" id="module-{{ module_item.module.id }}" data-module-id="{{ module_item.module.id }}">
                         <div class="testcase-endpoint-list">
                             {% for endpoint in module_item.endpoint_groups %}
-                            {% set feature_name = endpoint.feature_name|default("接口功能待命名", true) %}
-
                             <div class="testcase-endpoint-item">
-                                <button
-                                    class="testcase-endpoint-toggle"
-                                    type="button"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#endpoint-{{ module_item.module.id }}-{{ loop.index }}"
-                                    aria-expanded="false"
-                                    aria-controls="endpoint-{{ module_item.module.id }}-{{ loop.index }}"
-                                >
+                                <button class="testcase-endpoint-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#endpoint-{{ module_item.module.id }}-{{ loop.index }}">
                                     <div class="testcase-endpoint-main">
                                         <div class="testcase-endpoint-topline">
                                             <div class="testcase-endpoint-title-wrap">
-                                                <span class="testcase-feature-chip">{{ feature_name }}</span>
-                                                <span class="badge rounded-2 testcase-method-chip {% if endpoint.method == 'GET' %}text-bg-success{% elif endpoint.method == 'POST' %}text-bg-primary{% elif endpoint.method == 'PUT' %}text-bg-warning{% elif endpoint.method == 'DELETE' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
-                                                    {{ endpoint.method }}
-                                                </span>
+                                                <span class="testcase-feature-chip">{{ endpoint.feature_name|default('接口功能', true) }}</span>
+                                                <span class="badge rounded-2 testcase-method-chip text-bg-primary">{{ endpoint.method }}</span>
                                             </div>
                                             <span class="testcase-expand-chip"><i class="bi bi-chevron-down"></i></span>
                                         </div>
@@ -131,21 +98,10 @@
                                             <code class="testcase-url-chip">{{ endpoint.url }}</code>
                                             <div class="testcase-endpoint-meta">
                                                 <span class="testcase-meta-chip">{{ endpoint.testcases|length }} 个用例</span>
-                                                <span class="testcase-meta-chip text-success">{{ endpoint.active_count }} 启用</span>
-                                                {% if endpoint.inactive_count %}
-                                                <span class="testcase-meta-chip text-muted">{{ endpoint.inactive_count }} 停用</span>
-                                                {% endif %}
-                                                {% if endpoint.ai_count %}
-                                                <span class="testcase-meta-chip text-info">{{ endpoint.ai_count }} AI</span>
-                                                {% endif %}
-                                                {% if endpoint.manual_count %}
-                                                <span class="testcase-meta-chip text-muted">{{ endpoint.manual_count }} 手工</span>
-                                                {% endif %}
                                             </div>
                                         </div>
                                     </div>
                                 </button>
-
                                 <div class="collapse" id="endpoint-{{ module_item.module.id }}-{{ loop.index }}">
                                     <div class="testcase-endpoint-body">
                                         <div class="testcase-endpoint-scroll table-responsive">
@@ -169,31 +125,21 @@
                                                         <div class="testcase-case-desc">{{ item.description|clean_text('') }}</div>
                                                         {% endif %}
                                                     </td>
-                                                    <td>
-                                                        {% if item.source == 'ai' %}
-                                                        <span class="badge bg-info text-dark">AI</span>
-                                                        {% else %}
-                                                        <span class="badge bg-secondary">手工</span>
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>
-                                                        {% if item.is_active %}
-                                                        <span class="badge bg-success">启用</span>
-                                                        {% else %}
-                                                        <span class="badge bg-secondary">停用</span>
-                                                        {% endif %}
-                                                    </td>
+                                                    <td>{% if item.source == 'ai' %}<span class="badge bg-info text-dark">AI</span>{% else %}<span class="badge bg-secondary">手工</span>{% endif %}</td>
+                                                    <td>{% if item.is_active %}<span class="badge bg-success">启用</span>{% else %}<span class="badge bg-secondary">停用</span>{% endif %}</td>
                                                     <td>
                                                         <div class="testcase-action-group">
-                                                            <a class="btn btn-sm btn-outline-primary testcase-action-btn testcase-action-edit" href="{{ url_for('testcase.edit_testcase_page', testcase_id=item.id) }}">
-                                                                <i class="bi bi-pencil-square me-1"></i>编辑
-                                                            </a>
+                                                            {% if has_permission('testcase:edit') %}
+                                                            <a class="btn btn-sm btn-outline-primary testcase-action-btn testcase-action-edit" href="{{ url_for('testcase.edit_testcase_page', testcase_id=item.id) }}"><i class="bi bi-pencil-square me-1"></i>编辑</a>
+                                                            {% endif %}
+                                                            {% if has_permission('testcase:delete') %}
                                                             <form class="testcase-action-form" method="post" action="{{ url_for('testcase.delete_testcase', testcase_id=item.id) }}" onsubmit="return confirm('确认删除该用例吗？');">
                                                                 <button class="btn btn-sm btn-outline-danger testcase-action-btn testcase-action-delete" type="submit"><i class="bi bi-trash me-1"></i>删除</button>
                                                             </form>
-                                                            <a class="btn btn-sm btn-outline-success testcase-action-btn testcase-action-run" href="{{ url_for('execution.run_page', testcase_id=item.id) }}">
-                                                                <i class="bi bi-play-fill me-1"></i>去执行
-                                                            </a>
+                                                            {% endif %}
+                                                            {% if has_permission('execution:run') %}
+                                                            <a class="btn btn-sm btn-outline-success testcase-action-btn testcase-action-run" href="{{ url_for('execution.run_page', testcase_id=item.id) }}"><i class="bi bi-play-fill me-1"></i>去执行</a>
+                                                            {% endif %}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -209,37 +155,6 @@
                     </div>
                     {% endfor %}
                 </div>
-
-                {% if pagination.pages > 1 %}
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
-                    <small class="text-muted">分页按模块组计算，当前共 {{ pagination.total }} 个模块分组</small>
-                    <nav aria-label="Page navigation">
-                        <ul class="pagination justify-content-center mb-0">
-                            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                                <a class="page-link" href="{{ url_for('testcase.list_testcases', page=pagination.prev_num, project_id=request.args.get('project_id'), module_id=request.args.get('module_id'), interface_name=request.args.get('interface_name'), interface_url=request.args.get('interface_url')) }}" aria-label="Previous">
-                                    <span aria-hidden="true">&laquo;</span>
-                                </a>
-                            </li>
-                            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                                {% if page_num %}
-                                    {% if pagination.page == page_num %}
-                                        <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
-                                    {% else %}
-                                        <li class="page-item"><a class="page-link" href="{{ url_for('testcase.list_testcases', page=page_num, project_id=request.args.get('project_id'), module_id=request.args.get('module_id'), interface_name=request.args.get('interface_name'), interface_url=request.args.get('interface_url')) }}">{{ page_num }}</a></li>
-                                    {% endif %}
-                                {% else %}
-                                    <li class="page-item disabled"><span class="page-link">...</span></li>
-                                {% endif %}
-                            {% endfor %}
-                            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                                <a class="page-link" href="{{ url_for('testcase.list_testcases', page=pagination.next_num, project_id=request.args.get('project_id'), module_id=request.args.get('module_id'), interface_name=request.args.get('interface_name'), interface_url=request.args.get('interface_url')) }}" aria-label="Next">
-                                    <span aria-hidden="true">&raquo;</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </nav>
-                </div>
-                {% endif %}
                 {% else %}
                 <div class="empty-box">暂无用例数据</div>
                 {% endif %}
@@ -251,58 +166,23 @@
 
 {% block scripts %}
 <script>
-function findScrollableTestcaseArea(element) {
-    return element && element.closest ? element.closest(".testcase-endpoint-scroll") : null;
-}
-
-function canScrollVertically(scrollArea, deltaY) {
-    if (!scrollArea) {
-        return false;
-    }
-    if (deltaY > 0) {
-        return scrollArea.scrollTop + scrollArea.clientHeight < scrollArea.scrollHeight;
-    }
-    if (deltaY < 0) {
-        return scrollArea.scrollTop > 0;
-    }
-    return false;
-}
-
-document.addEventListener("wheel", function (event) {
-    const scrollArea = findScrollableTestcaseArea(event.target);
-    if (!scrollArea) {
-        return;
-    }
-    if (!canScrollVertically(scrollArea, event.deltaY)) {
-        return;
-    }
-    event.preventDefault();
-    scrollArea.scrollTop += event.deltaY;
-}, { passive: false, capture: true });
-
 let focusedModuleId = "";
-
 function setFocusedModule(moduleId) {
     focusedModuleId = moduleId || "";
-
     document.querySelectorAll(".testcase-nav-item[data-module-id]").forEach((navItem) => {
         const isActive = (navItem.dataset.moduleId || "") === focusedModuleId;
         navItem.classList.toggle("active", isActive);
-        navItem.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
-
     document.querySelectorAll(".testcase-module-card[data-module-id]").forEach((moduleCard) => {
         const shouldShow = !focusedModuleId || (moduleCard.dataset.moduleId || "") === focusedModuleId;
         moduleCard.classList.toggle("d-none", !shouldShow);
     });
 }
-
 document.querySelectorAll(".testcase-nav-item[data-module-id]").forEach((item) => {
     item.addEventListener("click", function () {
         setFocusedModule(this.dataset.moduleId || "");
     });
 });
-
 {% if selected_module_id %}
 setFocusedModule({{ selected_module_id|tojson }});
 {% endif %}

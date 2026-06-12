@@ -25,20 +25,20 @@ class ScenarioService:
 
     @staticmethod
     def get_by_id(scenario_id):
-        scenario = Scenario.query.get(scenario_id)
+        scenario = db.session.get(Scenario, scenario_id)
         if not scenario:
             raise ServiceError("场景不存在。")
         return scenario
 
     @staticmethod
     def create(project_id, module_id, name, description="", status="active", tags_text=""):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("所属项目不存在。")
 
         module_id = module_id or None
         if module_id:
-            module = Module.query.get(module_id)
+            module = db.session.get(Module, module_id)
             if not module or module.project_id != project_id:
                 raise ServiceError("所属模块不存在或与项目不匹配。")
 
@@ -68,7 +68,7 @@ class ScenarioService:
         scenario = ScenarioService.get_by_id(scenario_id)
         module_id = module_id or None
         if module_id:
-            module = Module.query.get(module_id)
+            module = db.session.get(Module, module_id)
             if not module or module.project_id != scenario.project_id:
                 raise ServiceError("所属模块不存在或与项目不匹配。")
 
@@ -210,7 +210,7 @@ class ScenarioService:
 
     @staticmethod
     def get_step_by_id(scenario_step_id):
-        step = ScenarioStep.query.get(scenario_step_id)
+        step = db.session.get(ScenarioStep, scenario_step_id)
         if not step:
             raise ServiceError("场景步骤不存在。")
         return step
@@ -237,7 +237,7 @@ class ScenarioService:
 
     @staticmethod
     def _get_valid_testcase(testcase_id, project_id):
-        testcase = TestCase.query.get(testcase_id)
+        testcase = db.session.get(TestCase, testcase_id)
         if not testcase or testcase.project_id != project_id:
             raise ServiceError("关联用例不存在或与场景项目不匹配。")
         return testcase

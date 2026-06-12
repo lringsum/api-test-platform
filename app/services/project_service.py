@@ -10,7 +10,7 @@ class ProjectService:
 
     @staticmethod
     def get_by_id(project_id):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("项目不存在。")
         return project

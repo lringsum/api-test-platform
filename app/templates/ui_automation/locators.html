@@ -1,0 +1,673 @@
+{% extends "base.html" %}
+
+{% block title %}UI 定位器库{% endblock %}
+{% block page_title %}UI 定位器库{% endblock %}
+{% block page_desc %}集中维护 Python + Playwright 脚本可复用的页面定位器，为 AI 生成和脚本修复提供稳定上下文。{% endblock %}
+
+{% block head %}
+<style>
+    .locator-stat {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 18px;
+        background: linear-gradient(145deg, #fff 0%, #f6f9ff 100%);
+    }
+
+    .locator-stat::after {
+        content: "";
+        position: absolute;
+        right: -18px;
+        bottom: -26px;
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: rgba(37, 99, 235, 0.08);
+    }
+
+    .locator-stat-value {
+        color: #15223a;
+        font-size: 1.7rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .locator-code {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border: 1px solid #dbe7ff;
+        border-radius: 8px;
+        background: #f2f6ff;
+        color: #245dcc;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.76rem;
+    }
+
+    .locator-value {
+        display: block;
+        max-width: 420px;
+        overflow: hidden;
+        color: #334155;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.78rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .locator-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .locator-toolbar .btn {
+        min-width: 96px;
+    }
+
+    .locator-bulk-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .locator-bulk-bar .badge {
+        min-width: 76px;
+        justify-content: center;
+    }
+
+    .locator-table th,
+    .locator-table td {
+        vertical-align: middle;
+    }
+
+    .locator-table .locator-row {
+        transition: background-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .locator-table .locator-row:hover {
+        background: rgba(37, 99, 235, 0.025);
+    }
+
+    .locator-row-selected {
+        background: rgba(37, 99, 235, 0.05) !important;
+    }
+
+    .locator-select-cell {
+        width: 42px;
+    }
+
+    .locator-mini-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.04);
+        color: #475569;
+        font-size: 0.72rem;
+        font-weight: 650;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="uiLocatorPage" class="d-flex flex-column gap-4">
+    <div class="page-action-panel p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <div class="text-uppercase text-muted small fw-semibold mb-2">UI Asset Library</div>
+                <h4 class="mb-2">定位器库</h4>
+                <p class="text-muted mb-0">把稳定的页面定位方式沉淀为项目资产，脚本和 AI 生成都使用同一份定位依据。</p>
+            </div>
+            <div class="locator-toolbar">
+                {% if has_permission('uiauto:locator:manage') %}
+                <button
+                    class="btn btn-outline-primary btn-sm"
+                    type="button"
+                    id="locatorExportButton"
+                    onclick="window.location='{{ url_for('ui_auto.export_locators', project_id=current_project_id or '') }}'">
+                    <i class="bi bi-download me-1"></i>导出 JSON
+                </button>
+                <button
+                    class="btn btn-outline-primary btn-sm"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#locatorImportDrawer">
+                    <i class="bi bi-upload me-1"></i>批量导入
+                </button>
+                <button
+                    class="btn btn-primary btn-sm"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#locatorDrawer"
+                    data-mode="create"
+                    data-form-action="{{ url_for('ui_auto.create_locator') }}"
+                    data-title="新建定位器"
+                    data-project-id="{{ current_project_id or '' }}">
+                    <i class="bi bi-plus-lg me-1"></i>新建定位器
+                </button>
+                {% endif %}
+                <a href="{{ url_for('ui_auto.index') }}" class="btn btn-outline-secondary btn-sm">返回总览</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-3 col-md-6">
+            <div class="locator-stat p-3 h-100">
+                <div class="text-muted small mb-2">定位器总数</div>
+                <div class="locator-stat-value">{{ stats.total }}</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="locator-stat p-3 h-100">
+                <div class="text-muted small mb-2">稳定定位器</div>
+                <div class="locator-stat-value text-success">{{ stats.stable }}</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="locator-stat p-3 h-100">
+                <div class="text-muted small mb-2">启用中</div>
+                <div class="locator-stat-value text-primary">{{ stats.active }}</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="locator-stat p-3 h-100">
+                <div class="text-muted small mb-2">覆盖页面</div>
+                <div class="locator-stat-value">{{ stats.pages }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-0">
+        <div class="card-body py-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <div class="fw-semibold mb-1">定位器管理洞察</div>
+                    <div class="text-muted small">快速看出哪些定位器真正被脚本引用，哪些是重复候选或长期闲置。</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for item in locator_overview.top_used[:4] %}
+                    <span class="badge text-bg-light border text-dark">
+                        {{ item.locator_name }} · {{ item.usage_count }} 次
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% if locator_overview.duplicate_candidates %}
+            <div class="mt-3 small text-muted">
+                重复候选：
+                {% for group in locator_overview.duplicate_candidates[:3] %}
+                <span class="badge text-bg-warning-subtle text-warning border border-warning-subtle me-1">
+                    {{ group['items']|length }} 个 {{ group.locator_type }} / {{ group.locator_value }}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <strong>筛选条件</strong>
+                <small class="text-muted ms-2">按页面、类型、状态和稳定性快速定位资产</small>
+            </div>
+            <div class="text-muted small">支持搜索编码、名称、页面和定位器值</div>
+        </div>
+        <div class="card-body">
+            <form method="get" action="{{ url_for('ui_auto.locators_page') }}" id="locatorFilterForm" class="row g-3 align-items-end">
+                <div class="col-xl-4 col-md-6">
+                    <label class="form-label">关键词</label>
+                    <input class="form-control" name="keyword" value="{{ keyword }}" placeholder="编码 / 名称 / 页面 / 定位器值">
+                </div>
+                <div class="col-xl-2 col-md-3">
+                    <label class="form-label">页面</label>
+                    <select class="form-select" name="page_name">
+                        <option value="">全部页面</option>
+                        {% for item in page_names %}
+                        <option value="{{ item }}" {% if selected_page_name == item %}selected{% endif %}>{{ item }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-xl-2 col-md-3">
+                    <label class="form-label">类型</label>
+                    <select class="form-select" name="locator_type">
+                        <option value="">全部类型</option>
+                        {% for value, label in [('role', 'Role'), ('label', 'Label'), ('placeholder', 'Placeholder'), ('text', 'Text'), ('testid', 'Test ID'), ('css', 'CSS'), ('xpath', 'XPath'), ('custom', 'Custom')] %}
+                        <option value="{{ value }}" {% if selected_locator_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-xl-2 col-md-3">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>启用</option>
+                        <option value="deprecated" {% if selected_status == 'deprecated' %}selected{% endif %}>废弃</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-md-3">
+                    <label class="form-label">稳定性</label>
+                    <select class="form-select" name="stable">
+                        <option value="">全部</option>
+                        <option value="yes" {% if selected_stable == 'yes' %}selected{% endif %}>稳定</option>
+                        <option value="no" {% if selected_stable == 'no' %}selected{% endif %}>待优化</option>
+                    </select>
+                </div>
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('ui_auto.locators_page') }}"><i class="bi bi-arrow-repeat me-1"></i>重置</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <strong>定位器列表</strong>
+                <span class="locator-mini-label">当前筛选 {{ locators|length }} 条</span>
+            </div>
+            <div class="text-muted small">项目内唯一编码，尽量使用稳定的 Role / Label / Test ID</div>
+        </div>
+        <div class="card-body p-0">
+            {% if locators %}
+            {% if has_permission('uiauto:locator:manage') %}
+            <form method="post" action="{{ url_for('ui_auto.batch_action_locators') }}" id="locatorBatchActionForm">
+                <input type="hidden" name="project_id" value="{{ selected_project_id or '' }}">
+                <input type="hidden" name="bulk_action" id="locatorBulkActionField" value="">
+                <div class="border-bottom bg-light-subtle px-3 py-2 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div class="locator-bulk-bar">
+                        <span class="badge text-bg-primary-subtle text-primary border border-primary-subtle" id="locatorSelectedCount">已选择 0 项</span>
+                        <button type="submit" class="btn btn-outline-success btn-sm" data-bulk-action="activate">批量启用</button>
+                        <button type="submit" class="btn btn-outline-warning btn-sm" data-bulk-action="deprecate">批量废弃</button>
+                        <button type="submit" class="btn btn-outline-info btn-sm" data-bulk-action="stable">设为稳定</button>
+                        <button type="submit" class="btn btn-outline-secondary btn-sm" data-bulk-action="unstable">设为待优化</button>
+                        <button type="submit" class="btn btn-outline-danger btn-sm" data-bulk-action="delete" onclick="return confirm('确认删除选中的定位器吗？');">批量删除</button>
+                    </div>
+                    <div class="text-muted small">仅对当前页面勾选项生效</div>
+                </div>
+            {% endif %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle mb-0 locator-table">
+                    <thead class="table-light">
+                        <tr>
+                            {% if has_permission('uiauto:locator:manage') %}
+                            <th class="locator-select-cell">
+                                <input class="form-check-input" type="checkbox" id="selectAllLocators">
+                            </th>
+                            {% endif %}
+                            <th style="width: 22%;">定位器</th>
+                            <th style="width: 18%;">页面</th>
+                            <th style="width: 12%;">类型</th>
+                            <th style="width: 28%;">定位器值</th>
+                            <th style="width: 10%;">引用</th>
+                            <th style="width: 9%;">稳定性</th>
+                            <th style="width: 9%;">状态</th>
+                            <th style="width: 12%;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in locators %}
+                        {% set locator = row.locator %}
+                        <tr class="locator-row" data-locator-row="{{ locator.id }}">
+                            {% if has_permission('uiauto:locator:manage') %}
+                            <td>
+                                <input class="form-check-input locator-row-checkbox" type="checkbox" name="locator_ids" value="{{ locator.id }}">
+                            </td>
+                            {% endif %}
+                            <td>
+                                <div class="fw-semibold mb-1">{{ locator.locator_name }}</div>
+                                <span class="locator-code">{{ locator.locator_code }}</span>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">{{ locator.page_name or '未归类页面' }}</div>
+                                <small class="text-muted d-block mt-1">{{ locator.page_url_pattern or '未配置 URL 规则' }}</small>
+                            </td>
+                            <td>
+                                <span class="badge text-bg-light border text-uppercase">{{ locator.locator_type }}</span>
+                            </td>
+                            <td>
+                                <span class="locator-value" title="{{ locator.locator_value }}">{{ locator.locator_value }}</span>
+                                <small class="text-muted d-block mt-1">{{ locator.description or locator.usage_scene or '暂无说明' }}</small>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">{{ row.usage_count }}</div>
+                                <small class="text-muted d-block mt-1">脚本引用</small>
+                            </td>
+                            <td>
+                                {% if locator.is_stable %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">稳定</span>
+                                {% else %}
+                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">待优化</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if locator.status == 'active' %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">启用</span>
+                                {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">废弃</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button
+                                        class="btn btn-sm btn-outline-secondary"
+                                        type="button"
+                                        data-copy-locator="{{ locator.locator_value | tojson }}">
+                                        复制
+                                    </button>
+                                    {% if has_permission('uiauto:locator:manage') %}
+                                    <button
+                                        class="btn btn-sm btn-outline-primary"
+                                        type="button"
+                                        data-bs-toggle="offcanvas"
+                                        data-bs-target="#locatorDrawer"
+                                        data-mode="edit"
+                                        data-form-action="{{ url_for('ui_auto.edit_locator', locator_id=locator.id) }}"
+                                        data-title="编辑定位器"
+                                        data-project-id="{{ locator.project_id }}"
+                                        data-locator-name="{{ locator.locator_name | tojson }}"
+                                        data-locator-code="{{ locator.locator_code | tojson }}"
+                                        data-locator-type="{{ locator.locator_type | tojson }}"
+                                        data-locator-value="{{ locator.locator_value | tojson }}"
+                                        data-page-name="{{ locator.page_name | tojson }}"
+                                        data-page-url-pattern="{{ locator.page_url_pattern | tojson }}"
+                                        data-description="{{ locator.description | tojson }}"
+                                        data-usage-scene="{{ locator.usage_scene | tojson }}"
+                                        data-stable="{{ '1' if locator.is_stable else '0' }}"
+                                        data-status="{{ locator.status | tojson }}">
+                                        编辑
+                                    </button>
+                                    <form method="post" action="{{ url_for('ui_auto.delete_locator', locator_id=locator.id) }}" onsubmit="return confirm('确认删除该定位器吗？');" class="d-inline">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">删除</button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if has_permission('uiauto:locator:manage') %}
+            </form>
+            {% endif %}
+            {% else %}
+            <div class="empty-box m-3">暂无定位器数据。可以先从登录页、导航栏等高频页面开始沉淀。</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if has_permission('uiauto:locator:manage') %}
+<div class="offcanvas offcanvas-end app-edit-drawer" tabindex="-1" id="locatorDrawer" aria-labelledby="locatorDrawerLabel">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title mb-1" id="locatorDrawerLabel">新建定位器</h5>
+            <div class="text-muted small">优先沉淀 Role、Label、Test ID 等更稳定的定位方式。</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form method="post" id="locatorForm">
+            {% if current_project_id %}
+            <input type="hidden" name="project_id" id="locatorProjectId" value="{{ current_project_id }}">
+            {% else %}
+            <div class="drawer-section">
+                <div class="drawer-section-title">所属项目</div>
+                <select class="form-select" name="project_id" id="locatorProjectId" required>
+                    <option value="">请选择项目</option>
+                    {% for project in global_projects %}
+                    <option value="{{ project.id }}">{{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="drawer-section">
+                <div class="drawer-section-title">基础信息</div>
+                <div class="row g-3">
+                    <div class="col-lg-4">
+                        <label class="form-label">定位器编码</label>
+                        <input class="form-control" name="locator_code" id="locatorCode" placeholder="login.submit_button" required>
+                        <div class="form-text">项目内唯一，建议使用 page.element 格式。</div>
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label">定位器名称</label>
+                        <input class="form-control" name="locator_name" id="locatorName" placeholder="登录提交按钮" required>
+                    </div>
+                    <div class="col-lg-2">
+                        <label class="form-label">状态</label>
+                        <select class="form-select" name="status" id="locatorStatus">
+                            <option value="active">启用</option>
+                            <option value="deprecated">废弃</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-2">
+                        <label class="form-label">稳定性</label>
+                        <select class="form-select" name="is_stable" id="locatorStable">
+                            <option value="1">稳定</option>
+                            <option value="0">待优化</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-title">页面归属</div>
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label">页面名称</label>
+                        <input class="form-control" name="page_name" id="locatorPageName" placeholder="登录页">
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label">URL 匹配规则</label>
+                        <input class="form-control" name="page_url_pattern" id="locatorPageUrlPattern" placeholder="/login 或 **/login">
+                    </div>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <div class="drawer-section-title">定位规则</div>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">定位器类型</label>
+                        <select class="form-select" name="locator_type" id="locatorType">
+                            <option value="role">Role</option>
+                            <option value="label">Label</option>
+                            <option value="placeholder">Placeholder</option>
+                            <option value="text">Text</option>
+                            <option value="testid">Test ID</option>
+                            <option value="css">CSS</option>
+                            <option value="xpath">XPath</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="col-md-9">
+                        <label class="form-label">定位器值</label>
+                        <textarea class="form-control" name="locator_value" id="locatorValue" rows="3" placeholder='button[name="登录"] 或 {"role":"button","name":"登录"}' required></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">使用场景</label>
+                        <textarea class="form-control" name="usage_scene" id="locatorUsageScene" rows="4" placeholder="适用于登录页主操作区，提交账号密码。"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">说明</label>
+                        <textarea class="form-control" name="description" id="locatorDescription" rows="4" placeholder="说明为什么选择这个定位方式。"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-2">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+                <button type="submit" class="btn btn-primary">保存定位器</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-end app-edit-drawer" tabindex="-1" id="locatorImportDrawer" aria-labelledby="locatorImportDrawerLabel">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title mb-1" id="locatorImportDrawerLabel">批量导入定位器</h5>
+            <div class="text-muted small">直接粘贴 JSON 数组，支持名称、编码、类型和值等字段。</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form method="post" action="{{ url_for('ui_auto.batch_import_locators') }}">
+            {% if current_project_id %}
+            <input type="hidden" name="project_id" value="{{ current_project_id }}">
+            {% else %}
+            <div class="drawer-section">
+                <div class="drawer-section-title">导入到项目</div>
+                <select class="form-select" name="project_id" required>
+                    <option value="">请选择项目</option>
+                    {% for project in global_projects %}
+                    <option value="{{ project.id }}">{{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <div class="drawer-section">
+                <div class="drawer-section-title">JSON 数据</div>
+                <textarea
+                    class="form-control font-monospace"
+                    name="batch_locators_json"
+                    rows="18"
+                    placeholder='[{"locator_name":"登录按钮","locator_code":"login.submit_button","locator_type":"role","locator_value":"{\"role\":\"button\",\"name\":\"登录\"}","page_name":"登录页","status":"active","is_stable":true}]'></textarea>
+                <div class="form-text mt-2">支持数组或包含 items 的对象，系统会自动处理重复编码并补齐默认值。</div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 pt-2">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+                <button type="submit" class="btn btn-primary">开始导入</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const locatorDrawer = document.getElementById('locatorDrawer');
+    if (locatorDrawer) {
+        locatorDrawer.addEventListener('show.bs.offcanvas', event => {
+            const trigger = event.relatedTarget;
+            const form = document.getElementById('locatorForm');
+            if (!trigger || !form) return;
+
+            const readValue = value => {
+                if (value === undefined || value === null || value === '') return '';
+                try {
+                    return JSON.parse(value);
+                } catch (error) {
+                    return value;
+                }
+            };
+
+            form.reset();
+            form.action = trigger.dataset.formAction || form.action;
+            document.getElementById('locatorDrawerLabel').textContent = trigger.dataset.title || '定位器编辑';
+            document.getElementById('locatorName').value = readValue(trigger.dataset.locatorName);
+            document.getElementById('locatorCode').value = readValue(trigger.dataset.locatorCode);
+            document.getElementById('locatorType').value = readValue(trigger.dataset.locatorType) || 'role';
+            document.getElementById('locatorValue').value = readValue(trigger.dataset.locatorValue);
+            document.getElementById('locatorPageName').value = readValue(trigger.dataset.pageName);
+            document.getElementById('locatorPageUrlPattern').value = readValue(trigger.dataset.pageUrlPattern);
+            document.getElementById('locatorDescription').value = readValue(trigger.dataset.description);
+            document.getElementById('locatorUsageScene').value = readValue(trigger.dataset.usageScene);
+            document.getElementById('locatorStable').value = trigger.dataset.stable || '1';
+            document.getElementById('locatorStatus').value = readValue(trigger.dataset.status) || 'active';
+
+            const projectInput = document.getElementById('locatorProjectId');
+            if (projectInput && trigger.dataset.projectId) {
+                projectInput.value = trigger.dataset.projectId;
+            }
+        });
+    }
+
+    const locatorBatchActionForm = document.getElementById('locatorBatchActionForm');
+    const bulkActionField = document.getElementById('locatorBulkActionField');
+    if (locatorBatchActionForm && bulkActionField) {
+        locatorBatchActionForm.addEventListener('click', event => {
+            const button = event.target.closest('[data-bulk-action]');
+            if (!button) return;
+            const selected = locatorBatchActionForm.querySelectorAll('input[name="locator_ids"]:checked');
+            if (!selected.length) {
+                event.preventDefault();
+                alert('请先选择要操作的定位器。');
+                return;
+            }
+            bulkActionField.value = button.dataset.bulkAction || '';
+        });
+    }
+
+    const selectAllLocators = document.getElementById('selectAllLocators');
+    const selectedCount = document.getElementById('locatorSelectedCount');
+    const rowCheckboxes = () => Array.from(document.querySelectorAll('.locator-row-checkbox'));
+
+    const syncSelectionState = () => {
+        const checkboxes = rowCheckboxes();
+        const checkedCount = checkboxes.filter(item => item.checked).length;
+        if (selectedCount) {
+            selectedCount.textContent = `已选择 ${checkedCount} 项`;
+        }
+        if (selectAllLocators) {
+            selectAllLocators.checked = checkboxes.length > 0 && checkedCount === checkboxes.length;
+            selectAllLocators.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        }
+        checkboxes.forEach(item => {
+            const row = item.closest('.locator-row');
+            if (row) {
+                row.classList.toggle('locator-row-selected', item.checked);
+            }
+        });
+    };
+
+    if (selectAllLocators) {
+        selectAllLocators.addEventListener('change', event => {
+            rowCheckboxes().forEach(item => {
+                item.checked = event.target.checked;
+            });
+            syncSelectionState();
+        });
+    }
+
+    document.querySelectorAll('.locator-row-checkbox').forEach(item => {
+        item.addEventListener('change', syncSelectionState);
+    });
+    syncSelectionState();
+
+    document.querySelectorAll('[data-copy-locator]').forEach(button => {
+        button.addEventListener('click', async () => {
+            const rawValue = button.dataset.copyLocator || '';
+            let value = rawValue;
+            try {
+                const parsed = JSON.parse(rawValue);
+                value = typeof parsed === 'string' ? parsed : JSON.stringify(parsed, null, 2);
+            } catch (error) {
+                value = rawValue;
+            }
+            try {
+                await navigator.clipboard.writeText(value);
+                const original = button.innerText;
+                button.innerText = '已复制';
+                setTimeout(() => {
+                    button.innerText = original;
+                }, 1000);
+            } catch (error) {
+                alert('复制失败，请手动复制。');
+            }
+        });
+    });
+</script>
+{% endblock %}

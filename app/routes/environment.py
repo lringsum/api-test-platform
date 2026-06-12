@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
+from app.security import accessible_projects, require_permission
 from app.services.base_service import ServiceError
 from app.services.environment_service import EnvironmentService
 from app.services.project_service import ProjectService
@@ -10,10 +11,11 @@ environment_bp = Blueprint("environment", __name__, url_prefix="/environments")
 
 
 @environment_bp.route("/")
+@require_permission("environment:view")
 def list_environments():
     project_id = resolve_project_id()
     environments = EnvironmentService.list_all(project_id=project_id)
-    projects = ProjectService.list_all()
+    projects = accessible_projects()
     return render_template(
         "environments/list.html",
         environments=environments,
@@ -23,6 +25,7 @@ def list_environments():
 
 
 @environment_bp.route("/create", methods=["POST"])
+@require_permission("environment:create")
 def create_environment():
     try:
         EnvironmentService.create(
@@ -39,6 +42,7 @@ def create_environment():
 
 
 @environment_bp.route("/<int:environment_id>/edit", methods=["POST"])
+@require_permission("environment:edit")
 def edit_environment(environment_id):
     try:
         EnvironmentService.update(
@@ -56,6 +60,7 @@ def edit_environment(environment_id):
 
 
 @environment_bp.route("/<int:environment_id>/delete", methods=["POST"])
+@require_permission("environment:delete")
 def delete_environment(environment_id):
     try:
         EnvironmentService.delete(environment_id)

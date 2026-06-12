@@ -1,15 +1,18 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, redirect, render_template, request, url_for
 
+from app import db
 from app.models import ExecutionDetail
+from app.project_context import resolve_project_id
 from app.routes import catch_service_error_json, json_success
 from app.services.base_service import ServiceError
 from app.services.environment_service import EnvironmentService
 from app.services.execution_service import ExecutionService
 from app.services.module_service import ModuleService
 from app.services.project_service import ProjectService
+from app.services.report_service import ReportService
 from app.services.testcase_service import TestCaseService
 from app.utils.helpers import build_text_preview
-from app.project_context import resolve_project_id
+from app.security import require_permission
 
 execution_bp = Blueprint("execution", __name__, url_prefix="/executions")
 
@@ -90,10 +93,18 @@ def detail_page(execution_id):
     return render_template("execution/detail.html", execution=execution)
 
 
+@execution_bp.route("/<int:execution_id>/report")
+@require_permission("report:view")
+def execution_report_page(execution_id):
+    execution = ExecutionService.get_by_id(execution_id)
+    report = ReportService.generate(execution.id)
+    return redirect(url_for("report.detail_report", report_id=report.id))
+
+
 @execution_bp.route("/api/details/<int:detail_id>")
 @catch_service_error_json
 def detail_snapshot(detail_id):
-    detail = ExecutionDetail.query.get(detail_id)
+    detail = db.session.get(ExecutionDetail, detail_id)
     if not detail:
         raise ServiceError("执行明细不存在。")
 

@@ -1,101 +1,44 @@
-# GitHub + Vercel Deployment
+# Local Run Guide
 
-This project is now organized for a clean GitHub push and a straightforward Vercel import.
+This project is configured to use a local SQLite database only.
+All runtime data is stored in `instance/app.db` under the project directory.
 
-## What was added
+## What changed
 
-- `.gitignore` to keep local artifacts out of Git.
-- `.vercelignore` to keep local-only files out of Vercel uploads.
-- `api/index.py` as the Vercel-friendly Flask entry point.
-- `public/` for CSS and JS so Vercel can serve static assets cleanly.
+- The app no longer reads `DATABASE_URL` or PostgreSQL connection strings.
+- The database is always resolved to the local SQLite file in `instance/app.db`.
+- The Flask instance path is local to the project, so data stays on your machine.
 
-## Push to GitHub
+## Run locally
 
-Run these commands from the project root:
-
-```bash
-git init
-git add .
-git commit -m "initial commit"
-git branch -M main
-git remote add origin https://github.com/your-name/your-repo.git
-git push -u origin main
-```
-
-## Create the Vercel project
-
-1. Sign in to Vercel.
-2. Create a new project.
-3. Import the GitHub repository you just pushed.
-4. Keep the default framework detection.
-5. Add environment variables in Vercel if needed:
-   - `SECRET_KEY`
-   - `AI_MODE`
-   - `DEFAULT_TIMEOUT`
-   - `DATABASE_URL`
-
-## Production database: PostgreSQL
-
-For a real Vercel deployment, use PostgreSQL instead of SQLite.
-
-Recommended setup:
-
-1. Create a PostgreSQL database with a hosted provider available from Vercel Marketplace.
-2. Copy the connection string into the Vercel project as `DATABASE_URL`.
-3. Redeploy the project.
-
-The application now accepts PostgreSQL URLs such as:
+1. Install dependencies:
 
 ```bash
-postgresql+psycopg2://user:password@host:5432/dbname
+pip install -r requirements.txt
 ```
 
-It also accepts the common Vercel / provider forms:
+2. Start the app:
 
 ```bash
-postgres://user:password@host:5432/dbname
-postgresql://user:password@host:5432/dbname
+python run.py
 ```
 
-## Keep the existing data
+3. Open:
 
-If you already have data in the local SQLite file (`instance/app.db`), migrate it into PostgreSQL before switching traffic over.
+[http://127.0.0.1:5000/](http://127.0.0.1:5000/)
 
-Before migrating, freeze any writes to the old app so new data does not arrive in SQLite after the copy starts.
+## Data location
 
-Use the migration script:
+The SQLite database file is:
 
-```bash
-python scripts/migrate_sqlite_to_postgres.py --target "postgresql+psycopg2://user:password@host:5432/dbname"
+```text
+instance/app.db
 ```
 
-If your source database is not the default `instance/app.db`, pass it explicitly:
-
-```bash
-python scripts/migrate_sqlite_to_postgres.py --source "sqlite:///D:/path/to/app.db" --target "postgresql+psycopg2://user:password@host:5432/dbname"
-```
-
-The script copies all rows table by table and resets PostgreSQL sequences afterwards.
-
-Recommended migration flow:
-
-1. Stop or freeze the current SQLite-backed deployment.
-2. Run the migration script once.
-3. Point `DATABASE_URL` at the PostgreSQL database in Vercel.
-4. Redeploy and verify the data.
-5. Reopen writes on the new deployment.
-
-## Entry point
-
-Vercel should use `api/index.py`:
-
-```python
-from app import create_app
-
-app = create_app()
-```
+If you want to reset the data, stop the app and delete that file.
 
 ## Notes
 
-- This project does not need a custom `vercel.json` for the default Flask deployment path.
-- Let Vercel detect the Python app automatically from `api/index.py`.
+- Keep `instance/app.db` out of Git if you want to avoid committing local data.
+- The existing `seed_data.py` script can still be used to repopulate demo data.
+- If you previously used a hosted database, the app will no longer connect to it.

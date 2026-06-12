@@ -40,12 +40,14 @@
                 <label class="form-label">保存描述</label>
                 <input class="form-control" id="saveDescription" value="AI 解析生成">
             </div>
+            {% if has_permission('ai:use') %}
             <div class="col-12 d-flex gap-2 flex-wrap">
                 <button class="btn btn-primary" id="parseBtn" type="button">开始解析</button>
                 <button class="btn btn-outline-success" id="validateBtn" type="button">校验结果</button>
                 <button class="btn btn-success" id="saveBtn" type="button">保存为用例</button>
                 <button class="btn btn-outline-secondary" id="copyResultBtn" type="button">复制结果</button>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -54,12 +56,7 @@
     <div class="card h-100">
         <div class="card-header bg-white"><strong>接口文档输入</strong></div>
         <div class="card-body">
-            <textarea class="form-control json-textarea-lg" id="documentText" placeholder="请输入接口文档，例如：
-接口名称：登录
-请求方式：POST
-请求地址：/api/login
-请求参数：username, password
-响应示例：{ &quot;code&quot;: 0, &quot;data&quot;: { &quot;token&quot;: &quot;abc&quot; } }"></textarea>
+            <textarea class="form-control json-textarea-lg" id="documentText" placeholder="请输入接口文档"></textarea>
         </div>
     </div>
 
@@ -81,16 +78,15 @@ function getAiResultText() {
 async function parseAiDocument() {
     const documentText = document.getElementById("documentText").value;
     const templateId = document.getElementById("templateId").value || null;
-
     const result = await postJson("{{ url_for('ai.parse_document') }}", {
         document_text: documentText,
         template_id: templateId
     });
-
     showResultText("aiResult", result.data.case_data);
     return result.data.case_data;
 }
 
+{% if has_permission('ai:use') %}
 document.getElementById("parseBtn").addEventListener("click", async function () {
     try {
         await parseAiDocument();
@@ -148,5 +144,6 @@ document.getElementById("copyResultBtn").addEventListener("click", async functio
     await navigator.clipboard.writeText(text);
     alert("解析结果已复制");
 });
+{% endif %}
 </script>
 {% endblock %}

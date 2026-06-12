@@ -8,13 +8,13 @@
 <div class="card mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <strong>查询条件</strong>
-        <small class="text-muted">按模板名称和状态查询</small>
+        <small class="text-muted">按模板名称和状态筛选</small>
     </div>
     <div class="card-body">
         <form method="get" action="{{ url_for('prompt.list_prompts') }}" class="d-flex flex-wrap align-items-center gap-3">
             <div class="input-group" style="width: auto; min-width: 240px;">
                 <span class="input-group-text bg-light text-muted">模板</span>
-                <input class="form-control" name="keyword" value="{{ keyword or '' }}" placeholder="输入名称关键字">
+                <input class="form-control" name="keyword" value="{{ keyword or '' }}" placeholder="输入名称关键词">
             </div>
             <div class="input-group" style="width: auto; min-width: 180px;">
                 <span class="input-group-text bg-light text-muted">状态</span>
@@ -32,6 +32,7 @@
     </div>
 </div>
 
+{% if has_permission('prompt:create') %}
 <div class="card mb-4 page-action-panel">
     <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
         <strong>新增模板</strong>
@@ -60,8 +61,7 @@
                     </div>
                     <div class="col-12">
                         <label class="form-label">模板内容</label>
-                        <textarea class="form-control json-textarea-lg" name="content">请根据以下接口文档生成标准接口测试用例 JSON：
-{{ '{{document}}' }}</textarea>
+                        <textarea class="form-control json-textarea-lg" name="content">请根据以下接口文档生成标准接口测试用例JSON：{{ '{{document}}' }}</textarea>
                     </div>
                     <div class="col-12 d-flex justify-content-end">
                         <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>新增模板</button>
@@ -71,6 +71,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="card">
     <div class="card-header bg-white"><strong>模板列表</strong></div>
@@ -82,7 +83,7 @@
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div>
                         <div class="fw-semibold">{{ item.name }}</div>
-                        <small class="text-muted">{{ item.description or '无描述' }}</small>
+                        <small class="text-muted">{{ item.description or '暂无描述' }}</small>
                     </div>
                     <div class="d-flex gap-2 align-items-center">
                         {% if item.is_active %}
@@ -90,12 +91,17 @@
                         {% else %}
                         <span class="badge bg-secondary">停用</span>
                         {% endif %}
+                        {% if has_permission('prompt:edit') %}
                         <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editPrompt{{ item.id }}"><i class="bi bi-pencil-square me-1"></i>编辑</button>
+                        {% endif %}
+                        {% if has_permission('prompt:delete') %}
                         <form method="post" action="{{ url_for('prompt.delete_prompt', template_id=item.id) }}" onsubmit="return confirm('确认删除该模板吗？');">
                             <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>删除</button>
                         </form>
+                        {% endif %}
                     </div>
                 </div>
+                {% if has_permission('prompt:edit') %}
                 <div class="collapse" id="editPrompt{{ item.id }}">
                     <div class="card card-body bg-light mt-3">
                         <form method="post" action="{{ url_for('prompt.edit_prompt', template_id=item.id) }}">
@@ -126,6 +132,7 @@
                         </form>
                     </div>
                 </div>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
@@ -135,4 +142,3 @@
     </div>
 </div>
 {% endblock %}
-

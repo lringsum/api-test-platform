@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
+from app.security import require_permission
 from app.services.base_service import ServiceError
 from app.services.prompt_service import PromptService
 
@@ -8,6 +9,7 @@ prompt_bp = Blueprint("prompt", __name__, url_prefix="/prompts")
 
 
 @prompt_bp.route("/")
+@require_permission("prompt:view")
 def list_prompts():
     keyword = (request.args.get("keyword") or "").strip()
     status = (request.args.get("status") or "").strip()
@@ -28,6 +30,7 @@ def list_prompts():
 
 
 @prompt_bp.route("/create", methods=["POST"])
+@require_permission("prompt:create")
 def create_prompt():
     try:
         PromptService.create(
@@ -42,6 +45,7 @@ def create_prompt():
 
 
 @prompt_bp.route("/<int:template_id>/edit", methods=["POST"])
+@require_permission("prompt:edit")
 def edit_prompt(template_id):
     try:
         PromptService.update(
@@ -57,6 +61,7 @@ def edit_prompt(template_id):
 
 
 @prompt_bp.route("/<int:template_id>/delete", methods=["POST"])
+@require_permission("prompt:delete")
 def delete_prompt(template_id):
     try:
         PromptService.delete(template_id)

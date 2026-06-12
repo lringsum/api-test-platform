@@ -5,6 +5,21 @@
 {% block page_desc %}查看统计概览、失败摘要和执行明细{% endblock %}
 
 {% block content %}
+<div class="page-action-panel mb-4 p-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <div class="text-uppercase text-muted small fw-semibold mb-2">Report Replay</div>
+            <h4 class="mb-2">{{ report.title }}</h4>
+            <p class="text-muted mb-0">报告页用于回放执行结果、查看失败摘要，并快速跳回执行详情继续定位问题。</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-secondary" href="{{ url_for('execution.detail_page', execution_id=report.execution_id) }}">查看执行详情</a>
+            <a class="btn btn-outline-primary" href="{{ url_for('execution.execution_report_page', execution_id=report.execution_id) }}">刷新报告</a>
+            <a class="btn btn-outline-success" href="{{ url_for('report.list_reports', project_id=report.data.project_id) }}">返回列表</a>
+        </div>
+    </div>
+</div>
+
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card h-100">

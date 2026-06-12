@@ -63,7 +63,7 @@
                     <th>总步骤</th>
                     <th>通过</th>
                     <th>失败</th>
-                    <th>总耗时(ms)</th>
+                    <th>耗时(ms)</th>
                     <th>执行时间</th>
                     <th width="180">操作</th>
                 </tr>
@@ -92,18 +92,22 @@
                     <td>{{ item.duration_ms }}</td>
                     <td>{{ (item.started_at or item.created_at) | bjt }}</td>
                     <td class="d-flex gap-2">
+                        {% if has_permission('scenario:view') %}
                         <a class="btn btn-sm btn-outline-primary" href="{{ url_for('scenario.scenario_execution_detail', scenario_execution_id=item.id) }}"><i class="bi bi-file-text me-1"></i>详情</a>
+                        {% endif %}
+                        {% if has_permission('scenario:run') %}
                         <form method="post" action="{{ url_for('scenario.rerun_scenario_execution', scenario_execution_id=item.id) }}">
                             <input type="hidden" name="persist_extracted_to_environment" value="0">
                             <button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-play-fill me-1"></i>重跑</button>
                         </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
-        
+
         {% if pagination.pages > 1 %}
         <nav aria-label="Page navigation" class="mt-4">
             <ul class="pagination justify-content-center mb-0">
@@ -112,7 +116,6 @@
                         <span aria-hidden="true">&laquo;</span>
                     </a>
                 </li>
-                
                 {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                     {% if page_num %}
                         {% if pagination.page == page_num %}
@@ -124,7 +127,6 @@
                         <li class="page-item disabled"><span class="page-link">...</span></li>
                     {% endif %}
                 {% endfor %}
-
                 <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
                     <a class="page-link" href="{{ url_for('scenario.scenario_execution_history', page=pagination.next_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}" aria-label="Next">
                         <span aria-hidden="true">&raquo;</span>
@@ -133,7 +135,6 @@
             </ul>
         </nav>
         {% endif %}
-
         {% else %}
         <div class="empty-box">暂无场景执行历史</div>
         {% endif %}

@@ -15,6 +15,18 @@ from scripts.ui_regression_registry import PAGE_REGISTRY
 BASE_URL = "http://127.0.0.1:5000"
 
 
+def login(session):
+    response = session.get(f"{BASE_URL}/login", timeout=10)
+    response.raise_for_status()
+    response = session.post(
+        f"{BASE_URL}/login",
+        data={"username": "admin", "password": "admin123"},
+        timeout=10,
+        allow_redirects=True,
+    )
+    response.raise_for_status()
+
+
 def check_page(session, spec):
     response = session.get(f"{BASE_URL}{spec.path}", timeout=10)
     response.raise_for_status()
@@ -39,6 +51,7 @@ def check_page(session, spec):
 
 def main():
     session = requests.Session()
+    login(session)
     results = [check_page(session, spec) for spec in PAGE_REGISTRY]
     overall = "PASS" if all(item["status"] == "PASS" for item in results) else "FAIL"
 

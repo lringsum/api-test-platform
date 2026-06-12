@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
+from app.security import accessible_projects, require_permission
 from app.services.base_service import ServiceError
 from app.services.module_service import ModuleService
 from app.services.project_service import ProjectService
@@ -10,10 +11,11 @@ module_bp = Blueprint("module", __name__, url_prefix="/modules")
 
 
 @module_bp.route("/")
+@require_permission("module:view")
 def list_modules():
     project_id = resolve_project_id()
     modules = ModuleService.list_all(project_id=project_id)
-    projects = ProjectService.list_all()
+    projects = accessible_projects()
     return render_template(
         "modules/list.html",
         modules=modules,
@@ -23,6 +25,7 @@ def list_modules():
 
 
 @module_bp.route("/create", methods=["POST"])
+@require_permission("module:create")
 def create_module():
     try:
         ModuleService.create(
@@ -36,6 +39,7 @@ def create_module():
 
 
 @module_bp.route("/<int:module_id>/edit", methods=["POST"])
+@require_permission("module:edit")
 def edit_module(module_id):
     try:
         ModuleService.update(
@@ -49,6 +53,7 @@ def edit_module(module_id):
 
 
 @module_bp.route("/<int:module_id>/delete", methods=["POST"])
+@require_permission("module:delete")
 def delete_module(module_id):
     try:
         ModuleService.delete(module_id)

@@ -2,14 +2,14 @@ import json
 
 from flask import Blueprint, render_template, request
 
+from app import db
+from app.models import TestCase
+from app.project_context import resolve_project_id
 from app.routes import catch_service_error_json, handle_page_error, handle_success, json_success
 from app.services.base_service import ServiceError
 from app.services.module_service import ModuleService
 from app.services.project_service import ProjectService
 from app.services.testcase_service import TestCaseService
-from app.project_context import resolve_project_id
-from app.models import TestCase
-from app import db
 
 testcase_bp = Blueprint("testcase", __name__, url_prefix="/testcases")
 
@@ -159,7 +159,7 @@ def batch_rename_testcases():
         if not testcase_id or not new_name:
             continue
 
-        testcase = TestCase.query.get(testcase_id)
+        testcase = db.session.get(TestCase, testcase_id)
         if not testcase:
             continue
 

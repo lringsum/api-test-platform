@@ -18,14 +18,14 @@ class EnvironmentService:
 
     @staticmethod
     def get_by_id(environment_id):
-        environment = Environment.query.get(environment_id)
+        environment = db.session.get(Environment, environment_id)
         if not environment:
             raise ServiceError("环境不存在。")
         return environment
 
     @staticmethod
     def create(project_id, name, base_url, headers_json="{}", variables_json="{}", description=""):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("所属项目不存在。")
 

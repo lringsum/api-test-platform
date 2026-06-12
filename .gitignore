@@ -22,9 +22,7 @@ build/
 .vscode/
 
 # Local app/runtime files
-instance/*.db
-instance/*.sqlite3
-instance/*.sqlite
+instance/
 tmp/
 .dbg/
 .trae/

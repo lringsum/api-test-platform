@@ -2,7 +2,7 @@
 
 {% block title %}编辑场景{% endblock %}
 {% block page_title %}编辑场景{% endblock %}
-{% block page_desc %}配置场景基本信息与联动步骤{% endblock %}
+{% block page_desc %}配置场景基础信息与联动步骤{% endblock %}
 
 {% block content %}
 <div class="card mb-4">
@@ -42,7 +42,7 @@
                     </select>
                 </div>
                 <div class="col-md-9">
-                    <label class="form-label">场景描述</label>
+                    <label class="form-label">描述</label>
                     <input class="form-control" name="description" value="{{ scenario.description }}" placeholder="请输入场景用途说明">
                 </div>
                 <div class="col-md-3">
@@ -50,7 +50,9 @@
                     <input class="form-control" name="tags_text" value="{{ tags_text }}" placeholder="多个标签用逗号分隔">
                 </div>
                 <div class="col-12 d-flex gap-2">
+                    {% if has_permission('scenario:edit') %}
                     <button class="btn btn-success btn-sm" type="submit">保存场景</button>
+                    {% endif %}
                     <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('scenario.list_scenarios') }}">返回列表</a>
                 </div>
             </div>
@@ -58,6 +60,7 @@
     </div>
 </div>
 
+{% if has_permission('scenario:run') %}
 <div class="card mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <strong>执行场景</strong>
@@ -77,7 +80,7 @@
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">提取变量处理</label>
+                    <label class="form-label">变量同步处理</label>
                     <select class="form-select" name="persist_extracted_to_environment">
                         <option value="0">仅本次场景内传递</option>
                         <option value="1">同步写入环境变量</option>
@@ -91,11 +94,13 @@
         </form>
     </div>
 </div>
+{% endif %}
 
+{% if has_permission('scenario:edit') %}
 <div class="card mb-4 page-action-panel">
     <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
         <strong>新增步骤</strong>
-        <button class="btn btn-sm btn-outline-primary page-action-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#createScenarioStepPanel" aria-expanded="false" aria-controls="createScenarioStepPanel" title="展开新增" aria-label="展开新增">
+        <button class="btn btn-sm btn-outline-primary page-action-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#createScenarioStepPanel" aria-expanded="false" aria-controls="createScenarioStepPanel">
             <i class="bi bi-chevron-down"></i>
         </button>
     </div>
@@ -105,7 +110,7 @@
                 <div class="row g-3">
                     <div class="col-md-3">
                         <label class="form-label">步骤名称</label>
-                        <input class="form-control" name="name" placeholder="可为空，默认使用用例名称">
+                        <input class="form-control" name="name" placeholder="可留空，默认使用用例名">
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">选择用例</label>
@@ -154,15 +159,7 @@
         </div>
     </div>
 </div>
-
-<div class="card mb-4">
-    <div class="card-header bg-white"><strong>变量说明</strong></div>
-    <div class="card-body">
-        <div class="small text-muted">
-            前序步骤提取的变量可在后续步骤中通过 <code>${变量名}</code> 直接引用，例如 <code>${access_token}</code>。
-        </div>
-    </div>
-</div>
+{% endif %}
 
 <div class="card">
     <div class="card-header bg-white"><strong>场景步骤</strong></div>
@@ -184,28 +181,17 @@
                 {% for step in scenario.steps %}
                 <tr>
                     <td>{{ step.order_no }}</td>
-                    <td>{{ step.name or step.testcase.name if step.testcase else step.name or '-' }}</td>
+                    <td>{{ step.name or (step.testcase.name if step.testcase else '-') }}</td>
                     <td>{{ step.testcase.name if step.testcase else '-' }}</td>
                     <td>{{ '失败后继续' if step.continue_on_failure else '失败即终止' }}</td>
+                    <td>{% if step.is_enabled %}<span class="badge bg-success">启用</span>{% else %}<span class="badge bg-secondary">停用</span>{% endif %}</td>
                     <td>
-                        {% if step.is_enabled %}
-                        <span class="badge bg-success">启用</span>
-                        {% else %}
-                        <span class="badge bg-secondary">停用</span>
-                        {% endif %}
-                    </td>
-                    <td>
+                        {% if has_permission('scenario:edit') %}
                         <div class="d-flex flex-wrap gap-2 mb-2">
                             <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editStep{{ step.id }}">编辑</button>
-                            <form method="post" action="{{ url_for('scenario.move_scenario_step_up', scenario_step_id=step.id) }}">
-                                <button class="btn btn-sm btn-outline-secondary" type="submit">上移</button>
-                            </form>
-                            <form method="post" action="{{ url_for('scenario.move_scenario_step_down', scenario_step_id=step.id) }}">
-                                <button class="btn btn-sm btn-outline-secondary" type="submit">下移</button>
-                            </form>
-                            <form method="post" action="{{ url_for('scenario.delete_scenario_step', scenario_step_id=step.id) }}" onsubmit="return confirm('确认删除该步骤吗？');">
-                                <button class="btn btn-sm btn-danger" type="submit">删除</button>
-                            </form>
+                            <form method="post" action="{{ url_for('scenario.move_scenario_step_up', scenario_step_id=step.id) }}"><button class="btn btn-sm btn-outline-secondary" type="submit">上移</button></form>
+                            <form method="post" action="{{ url_for('scenario.move_scenario_step_down', scenario_step_id=step.id) }}"><button class="btn btn-sm btn-outline-secondary" type="submit">下移</button></form>
+                            <form method="post" action="{{ url_for('scenario.delete_scenario_step', scenario_step_id=step.id) }}" onsubmit="return confirm('确认删除该步骤吗？');"><button class="btn btn-sm btn-danger" type="submit">删除</button></form>
                         </div>
                         <div class="collapse" id="editStep{{ step.id }}">
                             <div class="card card-body bg-light">
@@ -236,28 +222,17 @@
                                             <option value="0" {% if not step.is_enabled %}selected{% endif %}>停用</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">步骤变量注入</label>
-                                        <textarea class="form-control form-control-sm json-textarea-sm" name="setup_variables_text">{{ step.setup_variables_json }}</textarea>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">请求覆盖</label>
-                                        <textarea class="form-control form-control-sm json-textarea-sm" name="request_overrides_text">{{ step.request_overrides_json }}</textarea>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">提取覆盖</label>
-                                        <textarea class="form-control form-control-sm json-textarea-sm" name="extract_overrides_text">{{ step.extract_overrides_json }}</textarea>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">断言覆盖</label>
-                                        <textarea class="form-control form-control-sm json-textarea-sm" name="assertion_overrides_text">{{ step.assertion_overrides_json }}</textarea>
-                                    </div>
+                                    <div class="col-md-6"><label class="form-label">步骤变量注入</label><textarea class="form-control form-control-sm json-textarea-sm" name="setup_variables_text">{{ step.setup_variables_json }}</textarea></div>
+                                    <div class="col-md-6"><label class="form-label">请求覆盖</label><textarea class="form-control form-control-sm json-textarea-sm" name="request_overrides_text">{{ step.request_overrides_json }}</textarea></div>
+                                    <div class="col-md-6"><label class="form-label">提取覆盖</label><textarea class="form-control form-control-sm json-textarea-sm" name="extract_overrides_text">{{ step.extract_overrides_json }}</textarea></div>
+                                    <div class="col-md-6"><label class="form-label">断言覆盖</label><textarea class="form-control form-control-sm json-textarea-sm" name="assertion_overrides_text">{{ step.assertion_overrides_json }}</textarea></div>
                                     <div class="col-12 d-flex justify-content-end">
                                         <button class="btn btn-sm btn-success" type="submit">保存修改</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

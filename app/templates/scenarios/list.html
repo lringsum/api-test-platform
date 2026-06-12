@@ -2,7 +2,7 @@
 
 {% block title %}场景管理{% endblock %}
 {% block page_title %}场景管理{% endblock %}
-{% block page_desc %}维护多接口联动场景，用于链路回归测试{% endblock %}
+{% block page_desc %}维护多接口联动场景，用于回归测试{% endblock %}
 
 {% block content %}
 <div class="card mb-3">
@@ -41,6 +41,7 @@
     </div>
 </div>
 
+{% if has_permission('scenario:create') %}
 <div class="card mb-4 page-action-panel">
     <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
         <strong>新增场景</strong>
@@ -71,7 +72,7 @@
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">场景名称</label>
-                        <input class="form-control" name="name" placeholder="如：初始化后登录校验" required>
+                        <input class="form-control" name="name" placeholder="例如：登录后首页校验" required>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">状态</label>
@@ -96,6 +97,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="card">
     <div class="card-header bg-white"><strong>场景列表</strong></div>
@@ -131,25 +133,28 @@
                         <span class="badge bg-secondary">停用</span>
                         {% endif %}
                     </td>
-                    <td>
-                        {% if item.tags %}
-                            {{ item.tags | join(', ') }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
+                    <td>{{ item.tags | join(', ') if item.tags else '-' }}</td>
                     <td>{{ item.updated_at | bjt }}</td>
                     <td>
                         <div class="d-flex flex-wrap gap-2 mb-2">
+                            {% if has_permission('scenario:run') %}
                             <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#runScenario{{ item.id }}">
                                 <i class="bi bi-play-fill me-1"></i>快捷执行
                             </button>
+                            {% endif %}
+                            {% if has_permission('scenario:edit') %}
                             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('scenario.edit_scenario_page', scenario_id=item.id) }}"><i class="bi bi-gear me-1"></i>配置</a>
+                            {% endif %}
+                            {% if has_permission('scenario:view') %}
                             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('scenario.scenario_execution_history', scenario_id=item.id) }}"><i class="bi bi-clock-history me-1"></i>记录</a>
+                            {% endif %}
+                            {% if has_permission('scenario:delete') %}
                             <form method="post" action="{{ url_for('scenario.delete_scenario', scenario_id=item.id) }}" onsubmit="return confirm('确认删除该场景吗？');">
                                 <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>删除</button>
                             </form>
+                            {% endif %}
                         </div>
+                        {% if has_permission('scenario:run') %}
                         <div class="collapse" id="runScenario{{ item.id }}">
                             <div class="card card-body bg-light">
                                 <form method="post" action="{{ url_for('scenario.run_scenario', scenario_id=item.id) }}" class="row g-2">
@@ -178,6 +183,7 @@
                                 </form>
                             </div>
                         </div>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -185,7 +191,7 @@
             </table>
         </div>
         {% else %}
-        <div class="empty-box">暂无场景，请先新增一个联动测试场景</div>
+        <div class="empty-box">暂无场景，请先新建一个联动测试场景</div>
         {% endif %}
     </div>
 </div>

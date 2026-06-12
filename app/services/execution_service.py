@@ -1,4 +1,4 @@
-﻿import time
+import time
 from copy import deepcopy
 from datetime import datetime
 
@@ -38,20 +38,20 @@ class ExecutionService:
 
     @staticmethod
     def get_by_id(execution_id):
-        execution = Execution.query.get(execution_id)
+        execution = db.session.get(Execution, execution_id)
         if not execution:
             raise ServiceError("执行记录不存在。")
         return execution
 
     @staticmethod
     def create_execution(project_id, environment_id, execution_type, target_type, target_id):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("所属项目不存在。")
 
         environment = None
         if environment_id:
-            environment = Environment.query.get(environment_id)
+            environment = db.session.get(Environment, environment_id)
             if not environment or environment.project_id != project_id:
                 raise ServiceError("环境不存在或与项目不匹配。")
 
@@ -70,7 +70,7 @@ class ExecutionService:
 
     @staticmethod
     def get_active_environment(project_id, environment_id):
-        environment = Environment.query.get(environment_id)
+        environment = db.session.get(Environment, environment_id)
         if not environment or environment.project_id != project_id:
             raise ServiceError("环境不存在或与项目不匹配。")
         if not environment.is_active:
@@ -154,7 +154,7 @@ class ExecutionService:
         execution = ExecutionService.get_by_id(execution_id)
 
         if testcase_id:
-            testcase = TestCase.query.get(testcase_id)
+            testcase = db.session.get(TestCase, testcase_id)
             if not testcase:
                 raise ServiceError("关联用例不存在。")
             if ExecutionService._looks_like_garbled_text(testcase_name):
@@ -195,7 +195,7 @@ class ExecutionService:
 
     @staticmethod
     def run_testcase(testcase_id, environment_id):
-        testcase = TestCase.query.get(testcase_id)
+        testcase = db.session.get(TestCase, testcase_id)
         if not testcase:
             raise ServiceError("用例不存在。")
         if not testcase.is_active:
@@ -273,7 +273,7 @@ class ExecutionService:
 
     @staticmethod
     def run_module(module_id, environment_id):
-        module = Module.query.get(module_id)
+        module = db.session.get(Module, module_id)
         if not module:
             raise ServiceError("模块不存在。")
 
@@ -347,7 +347,7 @@ class ExecutionService:
 
     @staticmethod
     def run_project(project_id, environment_id):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("项目不存在。")
 

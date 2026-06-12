@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
+from app.security import accessible_project_ids, accessible_projects, require_permission
 from app.services.base_service import ServiceError
 from app.services.environment_service import EnvironmentService
 from app.services.project_service import ProjectService
@@ -11,14 +12,16 @@ variable_bp = Blueprint("variable", __name__, url_prefix="/variables")
 
 
 @variable_bp.route("/")
+@require_permission("variable:view")
 def list_variables():
     project_id = resolve_project_id()
     environment_id = request.args.get("environment_id", type=int)
 
     variables = VariableService.list_all(project_id=project_id, environment_id=environment_id)
-    projects = ProjectService.list_all()
+    projects = accessible_projects()
     environments = EnvironmentService.list_all(project_id=project_id) if project_id else []
-    all_environments = EnvironmentService.list_all()
+    project_ids = accessible_project_ids()
+    all_environments = [env for env in EnvironmentService.list_all() if env.project_id in project_ids] if project_ids else []
 
     return render_template(
         "variables/list.html",
@@ -32,6 +35,7 @@ def list_variables():
 
 
 @variable_bp.route("/create", methods=["POST"])
+@require_permission("variable:create")
 def create_variable():
     try:
         VariableService.create(
@@ -48,6 +52,7 @@ def create_variable():
 
 
 @variable_bp.route("/<int:variable_id>/edit", methods=["POST"])
+@require_permission("variable:edit")
 def edit_variable(variable_id):
     try:
         VariableService.update(
@@ -64,6 +69,7 @@ def edit_variable(variable_id):
 
 
 @variable_bp.route("/<int:variable_id>/delete", methods=["POST"])
+@require_permission("variable:delete")
 def delete_variable(variable_id):
     try:
         VariableService.delete(variable_id)

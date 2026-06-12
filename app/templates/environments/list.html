@@ -20,6 +20,7 @@
     </div>
 </div>
 
+{% if has_permission('environment:create') %}
 <div class="card mb-4 page-action-panel">
     <div class="card-header bg-white d-flex justify-content-between align-items-center page-action-panel-header">
         <strong>新增环境</strong>
@@ -41,11 +42,11 @@
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">环境名称</label>
-                        <input class="form-control" name="name" placeholder="如：测试环境">
+                        <input class="form-control" name="name" placeholder="例如：测试环境">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Base URL</label>
-                        <input class="form-control" name="base_url" placeholder="如：http://127.0.0.1:5001">
+                        <input class="form-control" name="base_url" placeholder="例如：http://127.0.0.1:5001">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">默认请求头 JSON</label>
@@ -67,6 +68,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="card">
     <div class="card-header bg-white"><strong>环境列表</strong></div>
@@ -100,13 +102,18 @@
                     </td>
                     <td>
                         <div class="d-flex gap-2 mb-2">
+                            {% if has_permission('environment:edit') %}
                             <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editEnv{{ item.id }}">
                                 <i class="bi bi-pencil-square me-1"></i>编辑
                             </button>
+                            {% endif %}
+                            {% if has_permission('environment:delete') %}
                             <form method="post" action="{{ url_for('environment.delete_environment', environment_id=item.id) }}" onsubmit="return confirm('确认删除该环境吗？');">
                                 <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>删除</button>
                             </form>
+                            {% endif %}
                         </div>
+                        {% if has_permission('environment:edit') %}
                         <div class="collapse" id="editEnv{{ item.id }}">
                             <div class="card card-body bg-light">
                                 <form method="post" action="{{ url_for('environment.edit_environment', environment_id=item.id) }}" class="row g-2">
@@ -143,6 +150,7 @@
                                 </form>
                             </div>
                         </div>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -155,4 +163,3 @@
     </div>
 </div>
 {% endblock %}
-

@@ -24,14 +24,14 @@ class VariableService:
 
     @staticmethod
     def get_by_id(variable_id):
-        variable = Variable.query.get(variable_id)
+        variable = db.session.get(Variable, variable_id)
         if not variable:
             raise ServiceError("变量不存在。")
         return variable
 
     @staticmethod
     def create(project_id, name, value, scope="project", environment_id=None, description=""):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("所属项目不存在。")
 
@@ -43,7 +43,7 @@ class VariableService:
         if scope == "environment":
             if not environment_id:
                 raise ServiceError("环境级变量必须指定环境。")
-            environment = Environment.query.get(environment_id)
+            environment = db.session.get(Environment, environment_id)
             if not environment or environment.project_id != project_id:
                 raise ServiceError("所属环境不存在或与项目不匹配。")
         else:
@@ -81,7 +81,7 @@ class VariableService:
         if scope == "environment":
             if not environment_id:
                 raise ServiceError("环境级变量必须指定环境。")
-            environment = Environment.query.get(environment_id)
+            environment = db.session.get(Environment, environment_id)
             if not environment or environment.project_id != variable.project_id:
                 raise ServiceError("所属环境不存在或与项目不匹配。")
         else:
@@ -124,7 +124,7 @@ class VariableService:
 
     @staticmethod
     def build_project_variables(project_id):
-        project = Project.query.get(project_id)
+        project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("所属项目不存在。")
 
@@ -139,7 +139,7 @@ class VariableService:
         if not environment_id:
             return {}
 
-        environment = Environment.query.get(environment_id)
+        environment = db.session.get(Environment, environment_id)
         if not environment or environment.project_id != project_id:
             raise ServiceError("环境不存在或与项目不匹配。")
 
@@ -158,7 +158,7 @@ class VariableService:
         if not extracted_values:
             return
 
-        environment = Environment.query.get(environment_id)
+        environment = db.session.get(Environment, environment_id)
         if not environment or environment.project_id != project_id:
             raise ServiceError("环境不存在或与项目不匹配。")
 

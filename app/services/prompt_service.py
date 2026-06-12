@@ -16,7 +16,7 @@ class PromptService:
 
     @staticmethod
     def get_by_id(template_id):
-        template = PromptTemplate.query.get(template_id)
+        template = db.session.get(PromptTemplate, template_id)
         if not template:
             raise ServiceError("Prompt 模板不存在。")
         return template
