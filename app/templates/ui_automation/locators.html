@@ -1,8 +1,37 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}UI 定位器库{% endblock %}
 {% block page_title %}UI 定位器库{% endblock %}
 {% block page_desc %}集中维护 Python + Playwright 脚本可复用的页面定位器，为 AI 生成和脚本修复提供稳定上下文。{% endblock %}
+
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
+
+{% set workspace_page_class = 'ui-automation-locators-page' %}
+{% set workspace_layout_class = 'ui-automation-locators-layout' %}
+{% set workspace_rail_class = 'ui-automation-locators-rail' %}
+
+{% block workspace_heading %}UI 定位器库{% endblock %}
+{% block workspace_subtitle %}沉淀稳定的页面定位方式，让脚本和 AI 生成共用同一份上下文。{% endblock %}
+
+{% block workspace_actions %}
+<a class="btn btn-primary module-primary-btn" href="{{ url_for('ui_auto.index') }}">
+    <i class="bi bi-arrow-left"></i>
+    返回总览
+</a>
+<a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('ui_auto.scripts_page') }}">
+    <i class="bi bi-file-earmark-code"></i>
+    脚本管理
+</a>
+<a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('ui_auto.executions_page') }}">
+    <i class="bi bi-calendar2-event"></i>
+    执行计划
+</a>
+<a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('ui_auto.replays_page') }}">
+    <i class="bi bi-play-btn"></i>
+    报告回放
+</a>
+{% endblock %}
 
 {% block head %}
 <style>
@@ -64,7 +93,11 @@
     }
 
     .locator-toolbar .btn {
-        min-width: 96px;
+        min-width: 0;
+        height: 34px;
+        padding-inline: 12px;
+        font-size: 0.8rem;
+        font-weight: 650;
     }
 
     .locator-bulk-bar {
@@ -77,6 +110,31 @@
     .locator-bulk-bar .badge {
         min-width: 76px;
         justify-content: center;
+    }
+
+    .locator-bulk-bar .btn {
+        height: 32px;
+        padding-inline: 10px;
+        font-size: 0.78rem;
+        font-weight: 650;
+    }
+
+    .locator-row-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 6px;
+        justify-content: flex-end;
+        align-items: center;
+        white-space: nowrap;
+    }
+
+    .locator-row-actions .btn {
+        min-width: 0;
+        height: 30px;
+        padding-inline: 8px;
+        font-size: 0.76rem;
+        line-height: 1;
+        white-space: nowrap;
     }
 
     .locator-table th,
@@ -114,48 +172,8 @@
 </style>
 {% endblock %}
 
-{% block content %}
+{% block workspace_filter %}
 <div id="uiLocatorPage" class="d-flex flex-column gap-4">
-    <div class="page-action-panel p-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-            <div>
-                <div class="text-uppercase text-muted small fw-semibold mb-2">UI Asset Library</div>
-                <h4 class="mb-2">定位器库</h4>
-                <p class="text-muted mb-0">把稳定的页面定位方式沉淀为项目资产，脚本和 AI 生成都使用同一份定位依据。</p>
-            </div>
-            <div class="locator-toolbar">
-                {% if has_permission('uiauto:locator:manage') %}
-                <button
-                    class="btn btn-outline-primary btn-sm"
-                    type="button"
-                    id="locatorExportButton"
-                    onclick="window.location='{{ url_for('ui_auto.export_locators', project_id=current_project_id or '') }}'">
-                    <i class="bi bi-download me-1"></i>导出 JSON
-                </button>
-                <button
-                    class="btn btn-outline-primary btn-sm"
-                    type="button"
-                    data-bs-toggle="offcanvas"
-                    data-bs-target="#locatorImportDrawer">
-                    <i class="bi bi-upload me-1"></i>批量导入
-                </button>
-                <button
-                    class="btn btn-primary btn-sm"
-                    type="button"
-                    data-bs-toggle="offcanvas"
-                    data-bs-target="#locatorDrawer"
-                    data-mode="create"
-                    data-form-action="{{ url_for('ui_auto.create_locator') }}"
-                    data-title="新建定位器"
-                    data-project-id="{{ current_project_id or '' }}">
-                    <i class="bi bi-plus-lg me-1"></i>新建定位器
-                </button>
-                {% endif %}
-                <a href="{{ url_for('ui_auto.index') }}" class="btn btn-outline-secondary btn-sm">返回总览</a>
-            </div>
-        </div>
-    </div>
-
     <div class="row g-3">
         <div class="col-xl-3 col-md-6">
             <div class="locator-stat p-3 h-100">
@@ -273,7 +291,20 @@
                 <strong>定位器列表</strong>
                 <span class="locator-mini-label">当前筛选 {{ locators|length }} 条</span>
             </div>
-            <div class="text-muted small">项目内唯一编码，尽量使用稳定的 Role / Label / Test ID</div>
+            <div class="d-flex flex-wrap gap-2 locator-toolbar">
+                {% if has_permission('uiauto:locator:manage') %}
+                <button class="btn btn-outline-primary btn-sm" type="button" id="locatorExportButton" onclick="window.location='{{ url_for('ui_auto.export_locators', project_id=current_project_id or '') }}'">
+                    <i class="bi bi-download me-1"></i>导出 JSON
+                </button>
+                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#locatorImportDrawer">
+                    <i class="bi bi-upload me-1"></i>批量导入
+                </button>
+                <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#locatorDrawer" data-mode="create" data-form-action="{{ url_for('ui_auto.create_locator') }}" data-title="新建定位器" data-project-id="{{ current_project_id or '' }}">
+                    <i class="bi bi-plus-lg me-1"></i>新建定位器
+                </button>
+                {% endif %}
+                <a href="{{ url_for('ui_auto.index') }}" class="btn btn-outline-secondary btn-sm">返回总览</a>
+            </div>
         </div>
         <div class="card-body p-0">
             {% if locators %}
@@ -302,14 +333,14 @@
                                 <input class="form-check-input" type="checkbox" id="selectAllLocators">
                             </th>
                             {% endif %}
-                            <th style="width: 22%;">定位器</th>
-                            <th style="width: 18%;">页面</th>
-                            <th style="width: 12%;">类型</th>
-                            <th style="width: 28%;">定位器值</th>
-                            <th style="width: 10%;">引用</th>
-                            <th style="width: 9%;">稳定性</th>
-                            <th style="width: 9%;">状态</th>
-                            <th style="width: 12%;">操作</th>
+                            <th style="width: 18%;">定位器</th>
+                            <th style="width: 14%;">页面</th>
+                            <th style="width: 10%;">类型</th>
+                            <th style="width: 25%;">定位器值</th>
+                            <th style="width: 8%;">引用</th>
+                            <th style="width: 8%;">稳定性</th>
+                            <th style="width: 7%;">状态</th>
+                            <th style="width: 18%;">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -355,7 +386,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <div class="d-flex flex-wrap gap-2">
+                                <div class="locator-row-actions">
                                     <button
                                         class="btn btn-sm btn-outline-secondary"
                                         type="button"
@@ -405,7 +436,87 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>使用概览</strong>
+        <a href="{{ url_for('ui_auto.scripts_page') }}">查看脚本</a>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            {% for item in locator_overview.top_used[:4] %}
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-{{ loop.index0 % 4 }}">
+                    <i class="bi bi-crosshair"></i>
+                </span>
+                <div>
+                    <strong>{{ item.locator_name }}</strong>
+                    <small>{{ item.usage_count }} 次引用</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            <a class="module-quick-item" href="{{ url_for('ui_auto.scripts_page') }}">
+                <i class="bi bi-file-earmark-code"></i>
+                <span>脚本管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.executions_page') }}">
+                <i class="bi bi-calendar2-event"></i>
+                <span>执行计划</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.replays_page') }}">
+                <i class="bi bi-play-btn"></i>
+                <span>报告回放</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.index') }}">
+                <i class="bi bi-grid-1x2"></i>
+                <span>自动化总览</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="{{ url_for('ui_auto.scripts_page') }}">
+                <span class="module-insight-icon icon-0"><i class="bi bi-magic"></i></span>
+                <div>
+                    <strong>优先稳定 Role / Label</strong>
+                    <small>尽量把高频变动定位器沉淀成可复用上下文。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('ui_auto.index') }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-stars"></i></span>
+                <div>
+                    <strong>从页面生成定位骨架</strong>
+                    <small>先分析常用页面，再让 AI 补齐基础定位。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_drawers %}
 {% if has_permission('uiauto:locator:manage') %}
+
 <div class="offcanvas offcanvas-end app-edit-drawer" tabindex="-1" id="locatorDrawer" aria-labelledby="locatorDrawerLabel">
     <div class="offcanvas-header">
         <div>

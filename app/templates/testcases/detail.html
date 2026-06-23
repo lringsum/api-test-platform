@@ -1,0 +1,267 @@
+{% extends "shared/workspace_page.html" %}
+
+{% block title %}用例详情{% endblock %}
+{% block page_title %}用例详情{% endblock %}
+{% block page_desc %}查看用例配置、结构快照和最近执行记录{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
+
+{% set workspace_page_class = 'testcase-detail-page' %}
+{% set workspace_layout_class = 'testcase-detail-layout' %}
+
+{% set testcase_method = case_data.get('method', 'GET') | upper %}
+{% set testcase_url = case_data.get('url', '-') %}
+{% set testcase_active_label = '启用' if testcase.is_active else '停用' %}
+{% set testcase_active_class = 'status-active' if testcase.is_active else 'status-muted' %}
+{% set testcase_updated_text = testcase.updated_at | bjt %}
+{% set testcase_updated_date = testcase_updated_text.split(' ')[0] if ' ' in testcase_updated_text else testcase_updated_text %}
+{% set testcase_updated_time = testcase_updated_text.split(' ')[1] if ' ' in testcase_updated_text else '' %}
+{% set last_execution = recent_executions[0] if recent_executions else None %}
+{% if last_execution %}
+    {% if last_execution.status == 'passed' %}
+        {% set last_execution_label = '成功' %}
+        {% set last_execution_class = 'status-active' %}
+    {% elif last_execution.status == 'failed' %}
+        {% set last_execution_label = '失败' %}
+        {% set last_execution_class = 'status-muted' %}
+    {% else %}
+        {% set last_execution_label = last_execution.status %}
+        {% set last_execution_class = 'status-pending' %}
+    {% endif %}
+{% else %}
+    {% set last_execution_label = '暂无记录' %}
+    {% set last_execution_class = 'status-muted' %}
+{% endif %}
+
+{% block workspace_heading %}用例详情{% endblock %}
+{% block workspace_subtitle %}统一查看用例配置、结构快照和最近执行记录{% endblock %}
+
+{% block workspace_back %}
+<a class="btn btn-outline-secondary module-secondary-btn workspace-back-btn" href="{{ url_for('testcase.list_testcases') }}">
+    <i class="bi bi-arrow-left"></i>
+    返回列表
+</a>
+{% endblock %}
+
+{% block workspace_actions %}
+    {% if has_permission('testcase:edit') %}
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('testcase.edit_testcase_page', testcase_id=testcase.id) }}">
+        <i class="bi bi-pencil-square"></i>
+        编辑用例
+    </a>
+    {% endif %}
+    {% if has_permission('execution:run') %}
+    <a class="btn btn-primary module-primary-btn" href="{{ url_for('execution.run_page', project_id=testcase.project_id, testcase_id=testcase.id) }}">
+        <i class="bi bi-play-fill"></i>
+        去执行
+    </a>
+    {% endif %}
+{% endblock %}
+
+{% block workspace_metrics %}{% endblock %}
+
+{% block workspace_ai_banner %}{% endblock %}
+
+{% block workspace_filter %}
+<section class="card testcase-detail-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>基础信息</strong>
+            <small>{{ testcase.project.name }} · {{ testcase.module.name if testcase.module else '未分组' }}</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-chip module-count-chip">{{ testcase_active_label }}</span>
+            <span class="module-chip module-count-chip">{{ testcase.source }}</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="scenario-detail-grid">
+            <div class="scenario-detail-meta testcase-detail-meta">
+                <div><span>项目</span><strong>{{ testcase.project.name }}</strong></div>
+                <div><span>模块</span><strong>{{ testcase.module.name if testcase.module else '-' }}</strong></div>
+                <div><span>名称</span><strong>{{ testcase.name }}</strong></div>
+                <div><span>状态</span><strong class="scenario-detail-status {{ testcase_active_class }}">{{ testcase_active_label }}</strong></div>
+                <div><span>方法</span><strong>{{ testcase_method }}</strong></div>
+                <div><span>地址</span><strong>{{ testcase_url }}</strong></div>
+                <div><span>创建时间</span><strong>{{ testcase.created_at | bjt }}</strong></div>
+                <div><span>更新时间</span><strong>{{ testcase.updated_at | bjt }}</strong></div>
+            </div>
+            <div class="scenario-detail-notes">
+                <label class="form-label">用例描述</label>
+                <div class="testcase-detail-description">{{ testcase.description|default('暂无描述', true) }}</div>
+                <label class="form-label mt-3">用例快照</label>
+                <pre class="scenario-code-box testcase-detail-code">{{ case_json }}</pre>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_list %}
+<section class="card testcase-detail-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>用例结构</strong>
+            <small>请求头、查询参数、请求体、提取规则与断言配置</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-chip module-count-chip">{{ section_count }} 个已配置分组</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="testcase-structure-list">
+            {% for section in structure_sections %}
+            <article class="scenario-step-card card testcase-structure-card">
+                <button class="scenario-step-header" type="button" data-bs-toggle="collapse" data-bs-target="#testcaseSection{{ loop.index }}" aria-expanded="{{ 'true' if section.configured else 'false' }}" aria-controls="testcaseSection{{ loop.index }}">
+                    <div class="scenario-step-headline">
+                        <strong>{{ section.label }}</strong>
+                        <small>{{ section.summary }}</small>
+                    </div>
+                    <div class="scenario-step-meta">
+                        <span class="module-chip module-count-chip">#{{ loop.index }}</span>
+                        <span class="module-status-chip {{ 'status-active' if section.configured else 'status-muted' }}">
+                            <i class="bi bi-dot"></i>{{ '已配置' if section.configured else '未配置' }}
+                        </span>
+                    </div>
+                </button>
+                <div id="testcaseSection{{ loop.index }}" class="collapse {% if section.configured %}show{% endif %}">
+                    <div class="card-body">
+                        <pre class="scenario-code-box testcase-detail-code">{{ section.preview }}</pre>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="card testcase-detail-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>最近执行记录</strong>
+            <small>查看最近 5 条执行明细，快速定位回归差异</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-chip module-count-chip">{{ execution_count }} 条</span>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if recent_executions %}
+        <div class="scenario-step-list">
+            {% for detail in recent_executions %}
+            {% set execution = detail.execution %}
+            <article class="scenario-step-card card">
+                <button class="scenario-step-header" type="button" data-bs-toggle="collapse" data-bs-target="#testcaseExecution{{ detail.id }}" aria-expanded="{{ 'true' if loop.first else 'false' }}" aria-controls="testcaseExecution{{ detail.id }}">
+                    <div class="scenario-step-headline">
+                        <strong>执行 #{{ execution.id if execution else detail.id }}</strong>
+                        <small>{{ detail.testcase_name|default(testcase.name, true) }} · {{ ((execution.started_at or execution.created_at) | bjt) if execution else (detail.created_at | bjt) }}</small>
+                    </div>
+                    <div class="scenario-step-meta">
+                        <span class="module-chip module-count-chip">{{ detail.duration_ms }} ms</span>
+                        {% if detail.status == 'passed' %}
+                        <span class="module-status-chip status-active"><i class="bi bi-dot"></i>通过</span>
+                        {% elif detail.status == 'failed' %}
+                        <span class="module-status-chip status-muted"><i class="bi bi-dot"></i>失败</span>
+                        {% else %}
+                        <span class="module-status-chip status-pending"><i class="bi bi-dot"></i>{{ detail.status }}</span>
+                        {% endif %}
+                    </div>
+                </button>
+                <div id="testcaseExecution{{ detail.id }}" class="collapse {% if loop.first %}show{% endif %}">
+                    <div class="card-body">
+                        <div class="scenario-detail-grid testcase-execution-grid">
+                            <div class="scenario-detail-meta">
+                                <div><span>执行 ID</span><strong>{{ execution.id if execution else '-' }}</strong></div>
+                                <div><span>状态</span><strong class="scenario-detail-status {{ 'status-active' if detail.status == 'passed' else 'status-muted' }}">{{ detail.status }}</strong></div>
+                                <div><span>耗时</span><strong>{{ detail.duration_ms }} ms</strong></div>
+                                <div><span>执行时间</span><strong>{{ ((execution.started_at or execution.created_at) | bjt) if execution else (detail.created_at | bjt) }}</strong></div>
+                            </div>
+                            <div class="scenario-detail-notes">
+                                <label class="form-label">错误信息</label>
+                                <div class="testcase-detail-description">{{ detail.error_message|default('无', true) }}</div>
+                                <label class="form-label mt-3">执行摘要</label>
+                                <pre class="scenario-code-box testcase-detail-code">{{ {
+                                    "request": detail.request_data,
+                                    "response": detail.response_data,
+                                    "assertion": detail.assertion_data,
+                                    "extract": detail.extract_data
+                                } | tojson(indent=2) }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="module-empty-state">
+            <span><i class="bi bi-clock-history"></i></span>
+            <strong>当前用例暂无执行记录</strong>
+            <p>执行完成后，这里会展示最近的请求、响应、断言和提取结果。</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+        <a href="{{ url_for('testcase.list_testcases') }}">返回列表</a>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            {% if has_permission('testcase:edit') %}
+            <a class="module-quick-item" href="{{ url_for('testcase.edit_testcase_page', testcase_id=testcase.id) }}">
+                <i class="bi bi-pencil-square"></i><span>编辑用例</span>
+            </a>
+            {% endif %}
+            {% if has_permission('execution:run') %}
+            <a class="module-quick-item" href="{{ url_for('execution.run_page', project_id=testcase.project_id, testcase_id=testcase.id) }}">
+                <i class="bi bi-play-circle"></i><span>去执行</span>
+            </a>
+            {% endif %}
+            <a class="module-quick-item" href="{{ url_for('testcase.list_testcases', module_id=testcase.module_id) }}">
+                <i class="bi bi-diagram-3"></i><span>查看同组</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('scenario.list_scenarios') }}">
+                <i class="bi bi-bezier2"></i><span>场景管理</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header"><strong>AI 洞察</strong></div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-0"><i class="bi bi-file-earmark-text"></i></span>
+                <div><strong>检查请求结构完整性</strong><small>确认 headers、params、body 是否齐全且可复现</small></div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-1"><i class="bi bi-shield-check"></i></span>
+                <div><strong>关注断言稳定性</strong><small>将关键成功条件写入 assertions，减少脆弱回归</small></div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-2"><i class="bi bi-arrow-repeat"></i></span>
+                <div><strong>结合最近执行结果定位范围</strong><small>失败集中于同一接口时，优先检查公共前置数据</small></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header"><strong>当前状态</strong></div>
+    <div class="card-body module-side-body">
+        <div class="testcase-state-list">
+            <div class="testcase-state-item"><span>项目</span><strong>{{ testcase.project.name }}</strong></div>
+            <div class="testcase-state-item"><span>模块</span><strong>{{ testcase.module.name if testcase.module else '-' }}</strong></div>
+            <div class="testcase-state-item"><span>方法</span><strong>{{ testcase_method }}</strong></div>
+            <div class="testcase-state-item"><span>最近执行</span><strong class="{{ last_execution_class }}">{{ last_execution_label }}</strong></div>
+            <div class="testcase-state-item"><span>状态</span><strong>{{ testcase_active_label }}</strong></div>
+        </div>
+    </div>
+</section>
+{% endblock %}

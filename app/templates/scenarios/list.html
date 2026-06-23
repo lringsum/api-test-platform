@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}场景管理{% endblock %}
 {% block page_title %}场景管理{% endblock %}
@@ -6,150 +6,212 @@
 {% block topbar_class %}topbar-without-page{% endblock %}
 {% block topbar_page %}{% endblock %}
 
-{% block content %}
-<div class="api-workspace-page">
-<div class="api-workspace-header">
-    <div><span class="page-eyebrow">WORKFLOW ORCHESTRATION</span><h2>场景管理</h2><p>编排多接口联动测试流程，沉淀稳定可靠的回归场景。</p></div>
+{% set workspace_page_class = 'scenario-workspace-page' %}
+{% set scenario_total = scenario_stats.total %}
+
+{% block workspace_heading %}场景管理{% endblock %}
+{% block workspace_subtitle %}编排多接口联动测试流程，沉淀稳定可靠的回归场景{% endblock %}
+
+{% block workspace_actions %}
     {% if has_permission('scenario:create') %}
-    <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#createScenarioPanel"><i class="bi bi-plus-lg"></i>新增场景</button>
+    <button class="btn btn-primary module-primary-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#createScenarioDrawer">
+        <i class="bi bi-plus-lg"></i>
+        新增场景
+    </button>
     {% endif %}
-</div>
-<div class="card mb-3 api-filter-card">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <strong>查询条件</strong>
-        <small class="text-muted">按当前项目、模块、状态快速查询场景</small>
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('scenario.scenario_execution_history') }}">
+        <i class="bi bi-clock-history"></i>
+        执行记录
+    </a>
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-diagram-3"></i></span>
+        <div class="module-metric-copy">
+            <small>场景总数</small>
+            <strong>{{ scenario_total }}</strong>
+            <span>按当前项目范围统计</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-check2-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>启用中</small>
+            <strong>{{ scenario_stats.active }}</strong>
+            <span>可直接参与回归执行</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-slash-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>停用中</small>
+            <strong>{{ scenario_stats.inactive }}</strong>
+            <span>需要复核或补充步骤</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-list-ol"></i></span>
+        <div class="module-metric-copy">
+            <small>步骤总数</small>
+            <strong>{{ scenario_stats.steps }}</strong>
+            <span>累计编排的联动步骤</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 智能辅助</span>
+            <small>全新升级</small>
+        </div>
+        <p>自动梳理多接口调用链路，帮助生成更稳定的场景结构。</p>
     </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('scenario.list_scenarios') }}" class="d-flex flex-wrap align-items-center gap-3">
-            <div class="input-group" style="width: auto; min-width: 180px;">
-                <span class="input-group-text bg-light text-muted">模块</span>
-                <select class="form-select" name="module_id">
-                    <option value="">全部模块</option>
-                    {% for module in modules %}
-                    <option value="{{ module.id }}" {% if selected_module_id == module.id %}selected{% endif %}>{{ module.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="input-group" style="width: auto; min-width: 140px;">
-                <span class="input-group-text bg-light text-muted">状态</span>
-                <select class="form-select" name="status">
-                    <option value="">全部</option>
-                    <option value="active" {% if selected_status == 'active' %}selected{% endif %}>启用</option>
-                    <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>停用</option>
-                </select>
-            </div>
-            <div class="input-group" style="width: auto; min-width: 200px;">
-                <span class="input-group-text bg-light text-muted">名称</span>
-                <input class="form-control" name="keyword" value="{{ keyword }}" placeholder="关键词">
-            </div>
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
-                <a class="btn btn-outline-secondary" href="{{ url_for('scenario.list_scenarios') }}" title="重置"><i class="bi bi-eraser"></i></a>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="javascript:void(0)">
+        立即体验
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card module-filter-card">
+    <div class="card-body module-filter-body">
+        <form method="get" action="{{ url_for('scenario.list_scenarios') }}" class="module-filter-form">
+            <div class="module-filter-grid">
+                <div class="module-field">
+                    <label class="form-label">项目</label>
+                    <select class="form-select" name="project_id">
+                        <option value="">全部项目</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if selected_project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">模块</label>
+                    <select class="form-select" name="module_id">
+                        <option value="">全部模块</option>
+                        {% for module in modules %}
+                        <option value="{{ module.id }}" {% if selected_module_id == module.id %}selected{% endif %}>{{ module.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>启用</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>停用</option>
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">关键词</label>
+                    <input class="form-control" name="keyword" value="{{ keyword or '' }}" placeholder="搜索场景名称或描述">
+                </div>
+                <div class="module-filter-actions">
+                    <button class="btn btn-primary" type="submit">查询</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('scenario.list_scenarios') }}">重置</a>
+                    <button class="btn btn-link module-expand-link" type="button">展开 <i class="bi bi-chevron-down"></i></button>
+                </div>
             </div>
         </form>
     </div>
-</div>
+</section>
+{% endblock %}
 
-{% if has_permission('scenario:create') %}
-<div class="card mb-3 page-action-panel api-create-panel">
-    <div class="collapse" id="createScenarioPanel">
-        <div class="card-body page-action-panel-body">
-            <form method="post" action="{{ url_for('scenario.create_scenario') }}">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">所属项目</label>
-                        <select class="form-select" name="project_id" required>
-                            {% for project in projects %}
-                            <option value="{{ project.id }}">{{ project.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">所属模块</label>
-                        <select class="form-select" name="module_id">
-                            <option value="">无</option>
-                            {% for module in all_modules %}
-                            <option value="{{ module.id }}">{{ module.project.name }} / {{ module.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">场景名称</label>
-                        <input class="form-control" name="name" placeholder="例如：登录后首页校验" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">状态</label>
-                        <select class="form-select" name="status">
-                            <option value="active">启用</option>
-                            <option value="inactive">停用</option>
-                        </select>
-                    </div>
-                    <div class="col-md-9">
-                        <label class="form-label">场景描述</label>
-                        <input class="form-control" name="description" placeholder="请输入场景用途说明">
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">标签</label>
-                        <input class="form-control" name="tags_text" placeholder="多个标签用逗号分隔">
-                    </div>
-                    <div class="col-12 d-flex justify-content-end">
-                        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>新增场景</button>
-                    </div>
-                </div>
-            </form>
+{% block workspace_list %}
+<section class="card module-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>场景列表</strong>
+            <small>共 {{ scenario_total }} 个场景，按最近更新时间排序</small>
+        </div>
+        <div class="module-list-tools">
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-upload"></i>批量导入</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-download"></i>导出</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-three-dots"></i>更多操作</button>
         </div>
     </div>
-</div>
-{% endif %}
-
-<div class="card api-list-card">
-    <div class="card-header bg-white"><strong>场景列表</strong></div>
-    <div class="card-body">
-        {% if scenarios %}
-        <div class="table-responsive">
-            <table class="table table-hover">
+    <div class="card-body module-list-body">
+        {% if scenario_rows %}
+        <div class="table-responsive module-table-wrap">
+            <table class="table align-middle module-table scenario-list-table">
                 <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>场景名称</th>
-                    <th>项目</th>
-                    <th>模块</th>
-                    <th>步骤数</th>
-                    <th>状态</th>
-                    <th>标签</th>
-                    <th>更新时间</th>
-                    <th width="320">操作</th>
+                    <th style="width: 72px;">ID</th>
+                    <th style="width: 220px;">场景名称</th>
+                    <th style="width: 160px;">项目</th>
+                    <th style="width: 180px;">模块</th>
+                    <th style="width: 112px;">步骤数</th>
+                    <th style="width: 112px;">状态</th>
+                    <th style="width: 220px;">标签</th>
+                    <th style="width: 168px;">更新时间</th>
+                    <th style="width: 220px;">操作</th>
                 </tr>
                 </thead>
                 <tbody>
-                {% for item in scenarios %}
+                {% for row in scenario_rows %}
+                {% set item = row.scenario %}
+                {% if item.status == 'active' %}
+                    {% set status_label = '启用' %}
+                    {% set status_class = 'status-active' %}
+                {% else %}
+                    {% set status_label = '停用' %}
+                    {% set status_class = 'status-muted' %}
+                {% endif %}
                 <tr>
-                    <td>{{ item.id }}</td>
-                    <td>{{ item.name }}</td>
-                    <td>{{ item.project.name }}</td>
-                    <td>{{ item.module.name if item.module else '-' }}</td>
-                    <td>{{ item.steps|length }}</td>
+                    <td class="module-id-cell">{{ item.id }}</td>
                     <td>
-                        {% if item.status == 'active' %}
-                        <span class="badge bg-success">启用</span>
+                        <div class="module-name-cell">
+                            <span class="module-row-icon icon-{{ loop.index0 % 4 }}"><i class="bi bi-diagram-3"></i></span>
+                            <div>
+                                <strong>{{ item.name }}</strong>
+                                <small>SCN-{{ '%03d' | format(item.id) }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="module-chip module-project-chip"><i class="bi bi-folder2"></i>{{ item.project.name }}</span></td>
+                    <td>
+                        {% if item.module %}
+                        <span class="module-chip module-project-chip"><i class="bi bi-box"></i>{{ item.module.name }}</span>
                         {% else %}
-                        <span class="badge bg-secondary">停用</span>
+                        <span class="module-chip module-count-chip">-</span>
                         {% endif %}
                     </td>
-                    <td>{{ item.tags | join(', ') if item.tags else '-' }}</td>
-                    <td>{{ item.updated_at | bjt }}</td>
+                    <td><span class="module-chip module-count-chip">{{ row.step_count }}</span></td>
                     <td>
-                        <div class="d-flex flex-wrap gap-2 mb-2">
+                        <span class="module-status-chip {{ status_class }}">
+                            <i class="bi bi-dot"></i>{{ status_label }}
+                        </span>
+                    </td>
+                    <td class="module-description-cell">{{ item.tags | join(', ') if item.tags else '-' }}</td>
+                    <td class="module-time-cell">{{ item.updated_at | bjt }}</td>
+                    <td>
+                        <div class="module-row-actions">
                             {% if has_permission('scenario:run') %}
-                            <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#runScenario{{ item.id }}">
-                                <i class="bi bi-play-fill me-1"></i>快捷执行
-                            </button>
+                            <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="offcanvas" data-bs-target="#runScenarioDrawer{{ item.id }}">执行</button>
                             {% endif %}
                             {% if has_permission('scenario:edit') %}
-                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('scenario.edit_scenario_page', scenario_id=item.id) }}"><i class="bi bi-gear me-1"></i>配置</a>
+                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('scenario.edit_scenario_page', scenario_id=item.id) }}">配置</a>
                             {% endif %}
                             {% if has_permission('scenario:view') %}
-                            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('scenario.scenario_execution_history', scenario_id=item.id) }}"><i class="bi bi-clock-history me-1"></i>记录</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('scenario.scenario_execution_history', scenario_id=item.id) }}">记录</a>
                             {% endif %}
                             {% if has_permission('scenario:delete') %}
                             <form method="post" action="{{ url_for('scenario.delete_scenario', scenario_id=item.id) }}" onsubmit="return confirm('确认删除该场景吗？');">
@@ -157,46 +219,320 @@
                             </form>
                             {% endif %}
                         </div>
-                        {% if has_permission('scenario:run') %}
-                        <div class="collapse" id="runScenario{{ item.id }}">
-                            <div class="card card-body bg-light">
-                                <form method="post" action="{{ url_for('scenario.run_scenario', scenario_id=item.id) }}" class="row g-2">
-                                    <input type="hidden" name="back_to" value="list">
-                                    <div class="col-md-6">
-                                        <label class="form-label">执行环境</label>
-                                        <select class="form-select form-select-sm" name="environment_id" required>
-                                            <option value="">请选择环境</option>
-                                            {% for env in all_environments %}
-                                            {% if env.project_id == item.project_id %}
-                                            <option value="{{ env.id }}">{{ env.name }}</option>
-                                            {% endif %}
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">变量同步</label>
-                                        <select class="form-select form-select-sm" name="persist_extracted_to_environment">
-                                            <option value="0">仅本次场景内传递</option>
-                                            <option value="1">同步写入环境变量</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-12 d-flex justify-content-end">
-                                        <button class="btn btn-sm btn-primary" type="submit">开始执行</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
+        <div class="module-pagination">
+            <div class="module-pagination-info">共 {{ scenario_total }} 条</div>
+            <div class="module-pagination-controls">
+                <button class="btn btn-outline-secondary btn-sm" type="button" disabled><i class="bi bi-chevron-left"></i></button>
+                <button class="btn btn-primary btn-sm" type="button">1</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" disabled><i class="bi bi-chevron-right"></i></button>
+                <span>前往</span>
+                <input type="text" value="1" aria-label="页码">
+                <span>页</span>
+            </div>
+        </div>
         {% else %}
-        <div class="empty-box">暂无场景，请先新建一个联动测试场景</div>
+        <div class="module-empty-state">
+            <span><i class="bi bi-diagram-3"></i></span>
+            <strong>当前还没有场景</strong>
+            <p>新建场景后，可以把多接口步骤编排成可复用的回归流程。</p>
+        </div>
         {% endif %}
     </div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>最近动态</strong>
+        <a href="javascript:void(0)">查看全部</a>
+    </div>
+    <div class="card-body module-side-body">
+        {% if scenarios %}
+        <div class="module-activity-list">
+            {% for item in scenarios[:4] %}
+            <div class="module-activity-item">
+                <span class="module-activity-icon icon-{{ loop.index0 % 4 }}">
+                    <i class="bi bi-diagram-3"></i>
+                </span>
+                <div class="module-activity-copy">
+                    <strong>{{ item.name }} 有更新</strong>
+                    <small>{{ item.updated_at | bjt }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="module-rail-empty">暂无动态</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            {% if has_permission('scenario:create') %}
+            <button class="module-quick-item" type="button" data-bs-toggle="offcanvas" data-bs-target="#createScenarioDrawer">
+                <i class="bi bi-plus-lg"></i>
+                <span>新增场景</span>
+            </button>
+            {% endif %}
+            <a class="module-quick-item" href="{{ url_for('scenario.scenario_execution_history') }}">
+                <i class="bi bi-clock-history"></i>
+                <span>执行记录</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('module.list_modules') }}">
+                <i class="bi bi-box"></i>
+                <span>模块管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('environment.list_environments') }}">
+                <i class="bi bi-hdd-network"></i>
+                <span>环境管理</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+        <button class="module-side-refresh" type="button">换一换</button>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="javascript:void(0)">
+                <span class="module-insight-icon icon-0"><i class="bi bi-lightning-charge"></i></span>
+                <div>
+                    <strong>根据接口链路生成场景</strong>
+                    <small>自动编排多步骤联动流程</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="javascript:void(0)">
+                <span class="module-insight-icon icon-1"><i class="bi bi-list-check"></i></span>
+                <div>
+                    <strong>补充场景断言与标签</strong>
+                    <small>提高回归场景可读性与可维护性</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_drawers %}
+{% if has_permission('scenario:create') %}
+<div class="offcanvas offcanvas-end app-edit-drawer api-form-drawer scenario-create-drawer" tabindex="-1" id="createScenarioDrawer" aria-labelledby="createScenarioDrawerLabel">
+    <div class="offcanvas-header scenario-drawer-header">
+        <div>
+            <span class="scenario-drawer-kicker"><i class="bi bi-diagram-3"></i>场景编排</span>
+            <h5 class="offcanvas-title" id="createScenarioDrawerLabel">新增场景</h5>
+            <small>先建立场景骨架，创建后继续编排接口步骤</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
+    </div>
+    <form method="post" action="{{ url_for('scenario.create_scenario') }}" class="offcanvas-body drawer-form scenario-create-form" id="createScenarioForm">
+        <div class="scenario-create-overview">
+            <span class="scenario-create-overview-icon"><i class="bi bi-bezier2"></i></span>
+            <div>
+                <strong id="scenarioCreatePreviewName">新的联动场景</strong>
+                <p><span id="scenarioCreatePreviewProject">请选择项目</span><i class="bi bi-chevron-right"></i><span id="scenarioCreatePreviewModule">待选择模块</span></p>
+            </div>
+            <span class="module-status-chip status-active" id="scenarioCreatePreviewStatus"><i class="bi bi-dot"></i>启用</span>
+        </div>
+
+        <div class="drawer-section scenario-drawer-section">
+            <div class="drawer-section-heading">
+                <span class="drawer-section-number">01</span>
+                <div>
+                    <div class="drawer-section-title">归属信息</div>
+                    <small>限定场景可使用的模块、用例和环境范围</small>
+                </div>
+            </div>
+            <div class="scenario-create-grid">
+                <div class="module-field">
+                    <label class="form-label" for="scenarioCreateProject">所属项目</label>
+                    <select class="form-select" name="project_id" id="scenarioCreateProject" required>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if selected_project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label" for="scenarioCreateModule">所属模块</label>
+                    <select class="form-select" name="module_id" id="scenarioCreateModule">
+                        <option value="" data-project-id="">暂不归类</option>
+                        {% for module in all_modules %}
+                        <option value="{{ module.id }}" data-project-id="{{ module.project_id }}">{{ module.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="scenario-field-help">仅展示当前项目下的模块</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="drawer-section scenario-drawer-section">
+            <div class="drawer-section-heading">
+                <span class="drawer-section-number">02</span>
+                <div>
+                    <div class="drawer-section-title">基础信息</div>
+                    <small>名称与标签会用于列表搜索和执行记录识别</small>
+                </div>
+            </div>
+            <div class="scenario-create-grid">
+                <div class="module-field scenario-create-wide">
+                    <label class="form-label" for="scenarioCreateName">场景名称</label>
+                    <input class="form-control" name="name" id="scenarioCreateName" placeholder="例如：登录后首页核心链路校验" maxlength="120" required>
+                </div>
+                <div class="module-field">
+                    <label class="form-label" for="scenarioCreateStatus">初始状态</label>
+                    <select class="form-select" name="status" id="scenarioCreateStatus">
+                        <option value="active">启用，可立即执行</option>
+                        <option value="inactive">停用，完成编排后启用</option>
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label" for="scenarioCreateTags">标签</label>
+                    <input class="form-control" name="tags_text" id="scenarioCreateTags" placeholder="回归, 冒烟, 核心链路">
+                </div>
+                <div class="module-field scenario-create-wide">
+                    <label class="form-label" for="scenarioCreateDescription">场景描述</label>
+                    <textarea class="form-control" name="description" id="scenarioCreateDescription" rows="4" placeholder="说明业务目标、前置条件和预期覆盖范围"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="scenario-create-next">
+            <span><i class="bi bi-arrow-return-right"></i></span>
+            <div>
+                <strong>创建后会进入场景编辑页</strong>
+                <small>继续添加接口用例、变量传递、失败策略和断言覆盖。</small>
+            </div>
+        </div>
+
+        <div class="drawer-actions scenario-drawer-actions">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+            <button class="btn btn-primary" type="submit">
+                创建并编排
+                <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+        </div>
+    </form>
 </div>
+{% endif %}
+
+{% if has_permission('scenario:run') %}
+{% for item in scenarios %}
+<div class="offcanvas offcanvas-end app-edit-drawer api-form-drawer" tabindex="-1" id="runScenarioDrawer{{ item.id }}">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title">执行场景</h5>
+            <small>{{ item.name }}</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <form method="post" action="{{ url_for('scenario.run_scenario', scenario_id=item.id) }}" class="offcanvas-body drawer-form">
+        <input type="hidden" name="back_to" value="list">
+        <div class="drawer-section">
+            <div class="drawer-section-title">执行配置</div>
+            <div class="mb-3">
+                <label class="form-label">执行环境</label>
+                <select class="form-select" name="environment_id" required>
+                    <option value="">请选择环境</option>
+                    {% for env in all_environments %}
+                    {% if env.project_id == item.project_id %}
+                    <option value="{{ env.id }}">{{ env.name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">变量同步</label>
+                <select class="form-select" name="persist_extracted_to_environment">
+                    <option value="0">仅本次场景内传递</option>
+                    <option value="1">同步写入环境变量</option>
+                </select>
+            </div>
+        </div>
+        <div class="drawer-actions">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+            <button class="btn btn-primary" type="submit">开始执行</button>
+        </div>
+    </form>
 </div>
+{% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const projectSelect = document.getElementById("scenarioCreateProject");
+    const moduleSelect = document.getElementById("scenarioCreateModule");
+    const nameInput = document.getElementById("scenarioCreateName");
+    const statusSelect = document.getElementById("scenarioCreateStatus");
+    const previewName = document.getElementById("scenarioCreatePreviewName");
+    const previewProject = document.getElementById("scenarioCreatePreviewProject");
+    const previewModule = document.getElementById("scenarioCreatePreviewModule");
+    const previewStatus = document.getElementById("scenarioCreatePreviewStatus");
+
+    if (!projectSelect || !moduleSelect) {
+        return;
+    }
+
+    const syncModuleOptions = function () {
+        const projectId = projectSelect.value;
+        let firstVisibleOption = null;
+
+        Array.from(moduleSelect.options).forEach(function (option) {
+            const optionProjectId = option.dataset.projectId || "";
+            const isVisible = !option.value || optionProjectId === projectId;
+            option.hidden = !isVisible;
+            option.disabled = !isVisible;
+            if (isVisible && !firstVisibleOption) {
+                firstVisibleOption = option;
+            }
+        });
+
+        if (moduleSelect.selectedOptions[0]?.disabled) {
+            moduleSelect.value = firstVisibleOption?.value || "";
+        }
+    };
+
+    const syncPreview = function () {
+        previewName.textContent = nameInput.value.trim() || "新的联动场景";
+        previewProject.textContent = projectSelect.selectedOptions[0]?.textContent.trim() || "请选择项目";
+        previewModule.textContent = moduleSelect.value
+            ? moduleSelect.selectedOptions[0]?.textContent.trim()
+            : "暂不归类";
+
+        const isActive = statusSelect.value === "active";
+        previewStatus.classList.toggle("status-active", isActive);
+        previewStatus.classList.toggle("status-muted", !isActive);
+        previewStatus.innerHTML = '<i class="bi bi-dot"></i>' + (isActive ? "启用" : "停用");
+    };
+
+    projectSelect.addEventListener("change", function () {
+        syncModuleOptions();
+        syncPreview();
+    });
+    moduleSelect.addEventListener("change", syncPreview);
+    nameInput.addEventListener("input", syncPreview);
+    statusSelect.addEventListener("change", syncPreview);
+
+    syncModuleOptions();
+    syncPreview();
+});
+</script>
 {% endblock %}

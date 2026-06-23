@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
@@ -14,10 +16,23 @@ variable_bp = Blueprint("variable", __name__, url_prefix="/variables")
 @variable_bp.route("/")
 @require_permission("variable:view")
 def list_variables():
-    project_id = resolve_project_id()
+    project_id = request.args.get("project_id", type=int) or resolve_project_id()
     environment_id = request.args.get("environment_id", type=int)
+    keyword = (request.args.get("keyword") or "").strip()
+    scope = (request.args.get("scope") or "").strip()
 
     variables = VariableService.list_all(project_id=project_id, environment_id=environment_id)
+    if keyword:
+        lowered = keyword.lower()
+        variables = [
+            item
+            for item in variables
+            if lowered in item.name.lower()
+            or lowered in (item.value or "").lower()
+            or lowered in (item.description or "").lower()
+        ]
+    if scope in {"project", "environment"}:
+        variables = [item for item in variables if item.scope == scope]
     projects = accessible_projects()
     environments = EnvironmentService.list_all(project_id=project_id) if project_id else []
     project_ids = accessible_project_ids()
@@ -31,6 +46,9 @@ def list_variables():
         all_environments=all_environments,
         selected_project_id=project_id,
         selected_environment_id=environment_id,
+        keyword=keyword,
+        selected_scope=scope,
+        recent_cutoff=datetime.utcnow() - timedelta(days=7),
     )
 
 

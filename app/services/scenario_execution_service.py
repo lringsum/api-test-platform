@@ -6,6 +6,7 @@ from app.models import Scenario, ScenarioExecution, ScenarioExecutionDetail
 from app.services.base_service import ServiceError, commit_session
 from app.services.execution_service import ExecutionService
 from app.services.variable_service import VariableService
+from app.utils.trigger import normalize_trigger_type
 
 
 class ScenarioExecutionService:
@@ -39,12 +40,20 @@ class ScenarioExecutionService:
         return execution
 
     @staticmethod
-    def create_execution(scenario_id, environment_id, trigger_mode="manual"):
+    def create_execution(
+        scenario_id,
+        environment_id,
+        trigger_type="automatic",
+        trigger_user_id=None,
+    ):
         scenario = ScenarioExecutionService.get_scenario_by_id(scenario_id)
+        normalized_trigger_type = normalize_trigger_type(trigger_type)
         execution = ScenarioExecution(
             scenario_id=scenario.id,
             environment_id=environment_id,
-            trigger_mode=trigger_mode,
+            trigger_mode=normalized_trigger_type,
+            trigger_type=normalized_trigger_type,
+            trigger_user_id=trigger_user_id,
             status="running",
             started_at=datetime.utcnow(),
         )
@@ -113,7 +122,8 @@ class ScenarioExecutionService:
     def run_scenario(
         scenario_id,
         environment_id,
-        trigger_mode="manual",
+        trigger_type="automatic",
+        trigger_user_id=None,
         persist_extracted_to_environment=False,
         runtime_injections=None,
     ):
@@ -132,7 +142,8 @@ class ScenarioExecutionService:
         execution = ScenarioExecutionService.create_execution(
             scenario_id=scenario.id,
             environment_id=environment.id,
-            trigger_mode=trigger_mode,
+            trigger_type=trigger_type,
+            trigger_user_id=trigger_user_id,
         )
 
         runtime_variables = VariableService.build_runtime_variables(
@@ -247,12 +258,18 @@ class ScenarioExecutionService:
         return ScenarioExecutionService.get_execution_by_id(execution.id)
 
     @staticmethod
-    def rerun(scenario_execution_id, persist_extracted_to_environment=False):
+    def rerun(
+        scenario_execution_id,
+        persist_extracted_to_environment=False,
+        trigger_type="automatic",
+        trigger_user_id=None,
+    ):
         execution = ScenarioExecutionService.get_execution_by_id(scenario_execution_id)
         return ScenarioExecutionService.run_scenario(
             scenario_id=execution.scenario_id,
             environment_id=execution.environment_id,
-            trigger_mode="manual",
+            trigger_type=trigger_type,
+            trigger_user_id=trigger_user_id,
             persist_extracted_to_environment=persist_extracted_to_environment,
         )
 

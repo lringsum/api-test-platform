@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block workspace_topbar_page %}
+<div class="module-workspace-header workspace-topbar-header">
+    <div class="module-workspace-copy">
+        <div class="module-workspace-title-row" style="display:flex; align-items:center; gap:12px; min-width:0;">
+            {% block workspace_back %}{% endblock %}
+            <div class="module-workspace-title-copy">
+                <h2>{% block workspace_heading %}{% endblock %}</h2>
+                <p>{% block workspace_subtitle %}{% endblock %}</p>
+            </div>
+        </div>
+    </div>
+    <div class="module-workspace-actions">
+        {% block workspace_actions %}{% endblock %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="module-workspace-page {{ workspace_page_class | default('') | trim }}">
+    {% block workspace_metrics %}{% endblock %}
+    {% block workspace_ai_banner %}{% endblock %}
+
+    <div class="module-layout {{ workspace_layout_class | default('') | trim }}">
+        <div class="module-main-column">
+            {% block workspace_filter %}{% endblock %}
+            {% block workspace_list %}{% endblock %}
+        </div>
+
+        <aside class="module-rail {{ workspace_rail_class | default('') | trim }}">
+            {% block workspace_rail %}{% endblock %}
+        </aside>
+    </div>
+</div>
+
+{% block workspace_drawers %}{% endblock %}
+{% endblock %}

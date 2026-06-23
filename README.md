@@ -1,64 +1,89 @@
-# Flask 接口自动化测试 Web 平台
+# API Test Platform
 
-一个基于 Flask + SQLAlchemy + SQLite + Jinja2 + Bootstrap 5 的接口自动化测试平台，支持接口文档、AI 解析、用例管理、环境管理、变量替换、接口执行、断言验证、执行报告等完整流程。
+一个基于 Flask 的测试平台，覆盖两条主线能力：
 
-当前版本已改为本地 SQLite 数据库，数据默认保存在项目目录下的 `instance/app.db`，不会再读取公网数据库连接串。
+- API 测试设计、执行、报告
+- UI 自动化脚本管理、执行、回放
 
-## 1. 项目特性
+项目当前以本地 SQLite 为默认运行形态，适合单机开发、联调和功能迭代。
 
-- 项目管理
-- 模块管理
-- 环境管理
-- 变量管理
-- 接口用例管理
-- AI 接口文档解析
-- Prompt 模板管理
-- 接口执行引擎
-- 断言系统
-- 执行历史与执行详情
-- 自动生成测试报告
+## AI 接手须知
 
-## 2. 技术栈
+后续 AI 接手这个仓库时，默认先记住这几条：
 
-- 后端：Flask
-- ORM：SQLAlchemy / Flask-SQLAlchemy
-- 数据库：SQLite
-- 前端：Flask + Jinja2 + Bootstrap 5
-- HTTP 请求：requests
+- 这是一个 Flask 单体测试平台，主线同时包括 API 自动化和 UI 自动化
+- 默认数据库是本地 SQLite，路径为 `instance/app.db`
+- 当前真正生效的静态资源目录是 `public/`，不是 `app/static/`
+- 系统存在“当前项目”上下文，很多页面和接口会按 `project_id` / `active_project_id` 过滤
+- API 执行会把提取值回写到环境变量，执行链路带状态副作用
+- 权限系统已经有骨架，不要按“从 0 到 1 的全新设计题”理解
 
-## 3. 项目结构
+## AI 文档入口
+
+后续无论是人还是 AI，文档入口统一从这里进入：
+
+- [AI 文档索引](docs/DOC_INDEX.md)
+
+三份核心文档的职责分工：
+
+- `DOC_INDEX.md`：文档导航，告诉你按任务该读哪份
+- `AI_DEVELOPMENT_KNOWLEDGE_BASE.md`：当前代码真实运行机制
+- `project_long_term_memory_cn.md`：历史语境、高频业务场景、默认工作方式
+
+## 核心能力
+
+- 项目、模块、环境、变量管理
+- API 用例管理
+- 场景编排与串行执行
+- AI 辅助生成 API 测试用例
+- API 执行历史与测试报告
+- UI 自动化脚本管理
+- UI 定位器库
+- Playwright Worker 执行与产物回放
+- 用户、角色、项目成员、审计日志
+
+## 技术栈
+
+- Backend: Flask, Flask-SQLAlchemy, SQLAlchemy
+- Database: SQLite
+- Frontend: Jinja2, Bootstrap 5, plain JavaScript
+- Execution: requests, pytest, playwright
+
+## 目录概览
 
 ```text
 api-test-platform/
-├─ app/
-├─ api/
-├─ docs/
-├─ config.py
-├─ run.py
-├─ seed_data.py
-├─ requirements.txt
-└─ README.md
+├── app/          # Flask 应用、路由、服务、模板、模型
+├── api/          # 部署入口
+├── docs/         # 架构与知识文档
+├── public/       # 当前实际生效的静态资源
+├── scripts/      # 回归脚本、worker 启动、辅助脚本
+├── instance/     # 本地运行数据与 SQLite 数据库
+├── config.py
+├── run.py
+├── seed_data.py
+└── requirements.txt
 ```
 
-## 4. 安装依赖
+## 安装依赖
 
-建议使用 Python 3.10 及以上版本。
+建议使用 Python 3.10+。
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 5. 启动项目
+## 启动项目
 
 ```bash
 python run.py
 ```
 
-启动后访问：
+默认访问地址：
 
-[http://127.0.0.1:5000/](http://127.0.0.1:5000/)
+- [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
-如果需要局域网访问，可以设置：
+如需局域网访问，可设置：
 
 ```powershell
 $env:HOST="0.0.0.0"
@@ -67,69 +92,49 @@ $env:FLASK_DEBUG="false"
 python run.py
 ```
 
-## 6. 数据库位置
+## 数据位置
 
-数据库文件固定为：
+SQLite 数据库固定在：
 
 ```text
 instance/app.db
 ```
 
-如果想重置数据，停止应用后删除这个文件即可。
+如果需要重置本地数据，停止应用后删除这个文件即可。
 
-## 7. 初始化示例数据
+## 初始化示例数据
 
 ```bash
 python seed_data.py
 ```
 
-初始化后可看到示例：
+默认安全初始化由应用启动自动完成；`seed_data.py` 用于补充演示项目、模块、环境、变量和测试用例。
 
-- 项目
-- 模块
-- 环境
-- 变量
-- Prompt 模板
-- 测试用例
-- 执行记录
+默认管理员账号：
 
-## 8. 默认配置
+- 用户名：`admin`
+- 密码：`admin123`
 
-配置文件位于 `config.py`，当前可调配置包括：
+## 运行注意事项
 
-- `SECRET_KEY`
-- `AI_MODE`
-- `DEFAULT_TIMEOUT`
+- 当前 Flask 静态资源实际来自 `public/`，不是 `app/static/`
+- 项目没有启用正式 migration 体系，模型变更需要额外考虑数据库兼容
+- API 执行会把提取变量回写到环境变量，运行结果可能带状态副作用
+- 项目存在“当前项目”会话上下文，很多页面和接口会按当前项目自动过滤
 
-数据库已固定为本地 SQLite，不再使用 `DATABASE_URL` 或 PostgreSQL 连接串。
+## 常用脚本
 
-## 9. 常见问题
+- `python seed_data.py`
+- `python scripts/run_ui_regression.py`
+- `python scripts/test_ui_routes.py`
+- `python scripts/test_api_gate.py`
+- `python scripts/run_ui_automation_worker.py`
 
-### 9.1 页面打不开
+## 后续开发建议
 
-- 确认已执行 `pip install -r requirements.txt`
-- 确认已执行 `python run.py`
-- 确认本地端口 `5000` 未被占用
+无论是人还是 AI，在改动前都优先看这两处：
 
-### 9.2 AI 解析失败
+1. `docs/AI_DEVELOPMENT_KNOWLEDGE_BASE.md`
+2. 对应功能的 `app/routes/*.py` 与 `app/services/*.py`
 
-- 确认已创建并启用 Prompt 模板
-- 确认输入的是有效接口文档
-- 确认当前 `AI_MODE=mock`
-
-### 9.3 执行失败
-
-- 检查环境 `base_url` 是否正确
-- 检查变量是否已经配置
-- 检查接口是否可访问
-- 检查断言规则是否合理
-
-## 10. 后续扩展建议
-
-- 接入 Flask-Migrate
-- 增加数据库备份与恢复
-- 接入真实 AI 模型服务
-- 扩展更多请求方法，如 PUT / DELETE
-- 增加定时任务与批量执行
-- 补充用户登录和权限控制
-- 增加更完整的 JSONPath 语法
+这样最不容易改偏。

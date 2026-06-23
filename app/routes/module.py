@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
@@ -21,6 +23,7 @@ def list_modules():
         modules=modules,
         projects=projects,
         selected_project_id=project_id,
+        recent_cutoff=datetime.utcnow() - timedelta(days=7),
     )
 
 

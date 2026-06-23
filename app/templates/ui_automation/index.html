@@ -1,142 +1,230 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}UI 自动化总览{% endblock %}
 {% block page_title %}UI 自动化总览{% endblock %}
-{% block page_desc %}统一承载脚本、定位器、执行与回放能力，后续会逐步接入 AI 生成与修复。{% endblock %}
+{% block page_desc %}统一查看脚本、定位器、执行计划与报告回放，形成完整的 UI 自动化工作台{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
-{% block head %}
-<style>
-    .timeline-list {
-        display: grid;
-        gap: 14px;
-    }
+{% set workspace_page_class = 'ui-automation-overview-page' %}
+{% set workspace_layout_class = 'ui-automation-overview-layout' %}
+{% set workspace_rail_class = 'ui-automation-overview-rail' %}
 
-    .timeline-item {
-        display: flex;
-        gap: 12px;
-        align-items: flex-start;
-        padding: 14px 16px;
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 14px;
-        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-    }
+{% block workspace_heading %}UI 自动化总览{% endblock %}
+{% block workspace_subtitle %}统一查看脚本、定位器、执行计划与报告回放，形成完整的 UI 自动化工作台{% endblock %}
 
-    .timeline-dot {
-        width: 12px;
-        height: 12px;
-        margin-top: 4px;
-        border-radius: 999px;
-        background: linear-gradient(135deg, #2563eb, #60a5fa);
-        box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.08);
-        flex: 0 0 auto;
-    }
-</style>
+{% block workspace_actions %}
+    <a class="btn btn-primary module-primary-btn" href="{{ url_for('ui_auto.scripts_page') }}">
+        <i class="bi bi-file-earmark-code"></i>
+        脚本管理
+    </a>
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('ui_auto.locators_page') }}">
+        <i class="bi bi-crosshair"></i>
+        定位器库
+    </a>
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('ui_auto.executions_page') }}">
+        <i class="bi bi-calendar2-event"></i>
+        执行计划
+    </a>
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('ui_auto.replays_page') }}">
+        <i class="bi bi-play-btn"></i>
+        报告回放
+    </a>
 {% endblock %}
 
-{% block content %}
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="page-action-panel p-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-                <div>
-                    <div class="text-uppercase text-muted small fw-semibold mb-2">UI Automation Hub</div>
-                    <h4 class="mb-2">UI 自动化总览</h4>
-                    <p class="text-muted mb-0">先把脚本中心、定位器库、执行计划和报告回放串起来，再逐步补齐 AI 生成与修复能力。</p>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <a href="{{ url_for('ui_auto.index', section='scripts') }}" class="btn btn-primary btn-sm">脚本管理</a>
-                    <a href="{{ url_for('ui_auto.index', section='locators') }}" class="btn btn-outline-primary btn-sm">定位器库</a>
-                    <a href="{{ url_for('ui_auto.index', section='executions') }}" class="btn btn-outline-primary btn-sm">执行计划</a>
-                    <a href="{{ url_for('ui_auto.replays_page') }}" class="btn btn-outline-primary btn-sm">报告回放</a>
-                </div>
-            </div>
+{% block workspace_metrics %}
+<section class="module-metrics-grid ui-overview-metrics">
+    {% for card in card_specs %}
+    <article class="module-metric-card metric-{{ card.theme }}">
+        <span class="module-metric-icon"><i class="bi {{ card.icon }}"></i></span>
+        <div class="module-metric-copy">
+            <small>{{ card.title }}</small>
+            <strong>{{ card.count }}</strong>
+            <span>{{ card.note }}</span>
         </div>
-    </div>
-</div>
+        <div class="module-metric-spark spark-{{ card.theme }}"></div>
+    </article>
+    {% endfor %}
+</section>
+{% endblock %}
 
-<div class="row g-3">
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">脚本管理</div>
-            <div class="stat-value">已接入</div>
-            <div class="text-muted small mt-2">脚本列表、版本、批量导入和 AI 生成。</div>
+{% block workspace_ai_banner %}
+<section class="module-ai-banner ui-overview-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 智能辅助</span>
+            <small>全新升级</small>
         </div>
+        <p>自动整理脚本结构、定位器与执行结果，帮助你更快完成 UI 自动化接入、维护与回放定位。</p>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">定位器库</div>
-            <div class="stat-value">已接入</div>
-            <div class="text-muted small mt-2">稳定定位器、页面归属、AI 可复用上下文。</div>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
         </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">执行计划</div>
-            <div class="stat-value">已接入</div>
-            <div class="text-muted small mt-2">并行、定时、重试与任务队列。</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">报告回放</div>
-            <div class="stat-value">已接入</div>
-            <div class="text-muted small mt-2">Trace、视频、截图和日志统一回看。</div>
-        </div>
-    </div>
-</div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('ai.parser_page') }}">
+        立即体验
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
 
-<div class="row g-3 mt-1">
-    <div class="col-lg-8">
-        <div class="data-card h-100">
-            <div class="data-card-header">
-                <div>
-                    <h5 class="mb-1">推荐落地顺序</h5>
-                    <p class="text-muted mb-0">先把脚本中心打稳，再补执行回放与 AI 生成修复，最后做更细的智能辅助。</p>
+{% block workspace_filter %}
+<section class="card module-filter-card ui-overview-section-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>模块能力总览</strong>
+            <small>当前项目：{{ project_name }}</small>
+        </div>
+        <span class="module-section-kicker">Script / Locator / Execution / Replay</span>
+    </div>
+    <div class="card-body ui-overview-section-body">
+        <div class="ui-overview-feature-grid">
+            {% for card in card_specs %}
+            <a class="ui-overview-feature-card metric-{{ card.theme }}" href="{{ card.href }}">
+                <div class="ui-overview-feature-top">
+                    <span class="ui-overview-feature-icon"><i class="bi {{ card.icon }}"></i></span>
+                    <span class="module-chip">已接入</span>
                 </div>
-            </div>
-            <div class="p-4">
-                <div class="timeline-list">
-                    <div class="timeline-item">
-                        <div class="timeline-dot"></div>
-                        <div>
-                            <div class="fw-semibold">第一阶段：脚本中心</div>
-                            <div class="text-muted small">脚本列表、编辑器、版本、标签和基础校验。</div>
-                        </div>
-                    </div>
-                    <div class="timeline-item">
-                        <div class="timeline-dot"></div>
-                        <div>
-                            <div class="fw-semibold">第二阶段：执行与回放</div>
-                            <div class="text-muted small">浏览器执行、任务队列、截图、视频和 Trace 回放。</div>
-                        </div>
-                    </div>
-                    <div class="timeline-item">
-                        <div class="timeline-dot"></div>
-                        <div>
-                            <div class="fw-semibold">第三阶段：AI 辅助</div>
-                            <div class="text-muted small">自然语言生成脚本、失败修复建议和断言补全。</div>
-                        </div>
-                    </div>
+                <div class="ui-overview-feature-copy">
+                    <strong>{{ card.title }}</strong>
+                    <p>{{ card.note }}</p>
                 </div>
-            </div>
+                <div class="ui-overview-feature-footer">
+                    <span>进入管理</span>
+                    <i class="bi bi-arrow-right"></i>
+                </div>
+            </a>
+            {% endfor %}
         </div>
     </div>
+</section>
+{% endblock %}
 
-    <div class="col-lg-4">
-        <div class="data-card h-100">
-            <div class="data-card-header">
-                <div>
-                    <h5 class="mb-1">快捷入口</h5>
-                    <p class="text-muted mb-0">直接跳到具体模块继续操作。</p>
+{% block workspace_list %}
+<section class="card module-list-card ui-overview-roadmap-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>推荐落地顺序</strong>
+            <small>先把脚本中心打稳，再补定位器与执行回放能力</small>
+        </div>
+    </div>
+    <div class="card-body ui-overview-roadmap-body">
+        <div class="ui-overview-roadmap">
+            {% for step in roadmap_steps %}
+            <article class="ui-overview-step step-{{ step.theme }}">
+                <div class="ui-overview-step-index">{{ step.step }}</div>
+                <div class="ui-overview-step-copy">
+                    <strong>{{ step.title }}</strong>
+                    <p>{{ step.desc }}</p>
                 </div>
+            </article>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="card module-list-card ui-overview-status-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>接入状态总览</strong>
+            <small>围绕当前项目的自动化接入进度与健康度</small>
+        </div>
+    </div>
+    <div class="card-body ui-overview-status-body">
+        <div class="ui-overview-status-grid">
+            <div class="ui-overview-status-item">
+                <span>当前项目</span>
+                <strong>{{ project_name }}</strong>
+                <small>统一作为自动化配置上下文</small>
             </div>
-            <div class="p-4 d-grid gap-2">
-                <a class="btn btn-outline-primary text-start" href="{{ url_for('ui_auto.index', section='scripts') }}">脚本管理</a>
-                <a class="btn btn-outline-primary text-start" href="{{ url_for('ui_auto.index', section='locators') }}">定位器库</a>
-                <a class="btn btn-outline-primary text-start" href="{{ url_for('ui_auto.index', section='executions') }}">执行计划</a>
-                <a class="btn btn-outline-primary text-start" href="{{ url_for('ui_auto.replays_page') }}">报告回放</a>
+            <div class="ui-overview-status-item">
+                <span>脚本中心</span>
+                <strong>{{ card_specs[0].count }}</strong>
+                <small>{{ card_specs[0].note }}</small>
+            </div>
+            <div class="ui-overview-status-item">
+                <span>定位器库</span>
+                <strong>{{ card_specs[1].count }}</strong>
+                <small>{{ card_specs[1].note }}</small>
+            </div>
+            <div class="ui-overview-status-item">
+                <span>执行回放</span>
+                <strong>{{ card_specs[3].count }}</strong>
+                <small>{{ card_specs[3].note }}</small>
             </div>
         </div>
     </div>
-</div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>最近动态</strong>
+        <a href="{{ url_for('ui_auto.executions_page') }}">查看全部</a>
+    </div>
+    <div class="card-body module-side-body">
+        {% if recent_feed %}
+        <div class="module-insight-list">
+            {% for item in recent_feed %}
+            <a class="module-insight-item" href="{{ item.href }}">
+                <span class="module-insight-icon icon-{{ loop.index0 % 4 }}">
+                    <i class="bi {{ item.icon }}"></i>
+                </span>
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <small>{{ item.detail }}</small>
+                    <small>{{ item.time }}</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="module-rail-empty">暂无动态，先创建一个脚本或定位器吧</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            {% for item in quick_entries %}
+            <a class="module-quick-item" href="{{ item.href }}">
+                <i class="bi {{ item.icon }}"></i>
+                <span>{{ item.label }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+        <button class="module-side-refresh" type="button">换一批</button>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            {% for item in ai_recommendations %}
+            <a class="module-insight-item" href="{{ item.href }}">
+                <span class="module-insight-icon icon-{{ loop.index0 % 4 }}">
+                    <i class="bi {{ item.icon }}"></i>
+                </span>
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <small>{{ item.desc }}</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</section>
 {% endblock %}

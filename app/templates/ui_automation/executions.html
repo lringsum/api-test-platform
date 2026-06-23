@@ -1,113 +1,124 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}UI 执行计划{% endblock %}
 {% block page_title %}UI 执行计划{% endblock %}
-{% block page_desc %}选择 Python + Playwright 脚本、环境和浏览器，提交任务后由 Worker 执行并收集日志与回放产物。{% endblock %}
+{% block page_desc %}选择脚本、环境和浏览器，提交任务后由 Worker 执行并收集日志与回放产物。{% endblock %}
 
-{% block content %}
-<div class="alert alert-primary d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4" role="alert">
-    <div>
-        <div class="fw-semibold">Playwright Worker 已接入</div>
-        <div class="small">后端常驻模式：<code>python scripts/run_ui_automation_worker.py</code>，单次执行：<code>python scripts/run_ui_automation_worker.py --once</code></div>
-    </div>
-    <div class="d-flex flex-wrap gap-2">
-        <a href="{{ url_for('ui_auto.scripts_page') }}" class="btn btn-outline-primary btn-sm">返回脚本管理</a>
-        <a href="{{ url_for('ui_auto.index') }}" class="btn btn-outline-secondary btn-sm">返回总览</a>
-        <span class="badge text-bg-light border align-self-center">Python + pytest-playwright</span>
-    </div>
-</div>
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
-<div class="data-card mb-4">
-    <div class="data-card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+{% set workspace_page_class = 'ui-automation-executions-page' %}
+{% set workspace_layout_class = 'ui-automation-executions-layout' %}
+{% set workspace_rail_class = 'ui-automation-executions-rail' %}
+{% set selected_project_name = selected_project.name if selected_project else ('全部项目' if projects|length > 1 else '当前项目') %}
+{% set active_count = queue_stats.queued + queue_stats.running %}
+{% set finished_count = queue_stats.passed + queue_stats.failed + queue_stats.timeout %}
+
+{% block workspace_heading %}UI 执行计划{% endblock %}
+{% block workspace_subtitle %}选择脚本、环境和浏览器，提交任务后由 Worker 执行并收集日志与回放产物。{% endblock %}
+
+{% block workspace_actions %}
+<a href="{{ url_for('ui_auto.index') }}" class="btn btn-primary module-primary-btn">
+    <i class="bi bi-arrow-left"></i>
+    返回总览
+</a>
+<a href="{{ url_for('ui_auto.scripts_page') }}" class="btn btn-outline-primary module-secondary-btn">
+    <i class="bi bi-file-earmark-code"></i>
+    脚本管理
+</a>
+<a href="{{ url_for('ui_auto.locators_page') }}" class="btn btn-outline-primary module-secondary-btn">
+    <i class="bi bi-crosshair"></i>
+    定位器库
+</a>
+<a href="{{ url_for('ui_auto.replays_page') }}" class="btn btn-outline-primary module-secondary-btn">
+    <i class="bi bi-play-btn"></i>
+    报告回放
+</a>
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-list-check"></i></span>
+        <div class="module-metric-copy">
+            <small>计划总数</small>
+            <strong>{{ queue_stats.total }}</strong>
+            <span>当前可见的执行计划总量</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-play-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>排队 / 执行中</small>
+            <strong>{{ queue_stats.queued }} / {{ queue_stats.running }}</strong>
+            <span>等待 Worker 或正在执行的任务</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-shield-check"></i></span>
+        <div class="module-metric-copy">
+            <small>成功 / 失败</small>
+            <strong>{{ queue_stats.passed }} / {{ queue_stats.failed }}</strong>
+            <span>已结束任务的结果分布</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-braces"></i></span>
+        <div class="module-metric-copy">
+            <small>脚本 / 环境</small>
+            <strong>{{ queue_stats.scripts }} / {{ queue_stats.environments }}</strong>
+            <span>当前项目可用的执行资源</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner execution-workbench-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>Playwright Worker 已接入</span>
+            <small>自动执行</small>
+        </div>
+        <p>后端常驻模式：<code>python scripts/run_ui_automation_worker.py</code>，单次执行：<code>python scripts/run_ui_automation_worker.py --once</code></p>
+        <div class="execution-banner-meta">
+            <span class="module-side-badge">项目：{{ selected_project_name }}</span>
+            <span class="module-side-badge">环境：Python</span>
+            <span class="module-side-badge">运行时：Playwright</span>
+        </div>
+    </div>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-gear-wide-connected"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('ui_auto.scripts_page') }}">
+        返回脚本管理
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card module-filter-card execution-config-card" id="execution-config">
+    <div class="card-header module-list-header">
         <div>
-            <h5 class="mb-1">队列概览</h5>
-            <p class="text-muted mb-0">用颜色快速看懂当前执行计划的排队、执行和结果分布。</p>
+            <strong>执行配置</strong>
+            <small class="text-muted ms-2">选择脚本、环境、浏览器和执行方式后提交任务</small>
         </div>
-        <div class="text-muted small">最近 {{ queue_stats.total }} 条可见计划</div>
-    </div>
-    <div class="p-4">
-        <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="badge bg-warning text-dark">排队 {{ queue_stats.queued }}</span>
-            <span class="badge bg-primary">执行中 {{ queue_stats.running }}</span>
-            <span class="badge bg-success">成功 {{ queue_stats.passed }}</span>
-            <span class="badge bg-danger">失败 {{ queue_stats.failed }}</span>
-            <span class="badge bg-dark">超时 {{ queue_stats.timeout }}</span>
-            <span class="badge text-bg-light border">脚本 {{ queue_stats.scripts }}</span>
-            <span class="badge text-bg-light border">环境 {{ queue_stats.environments }}</span>
-        </div>
-        <div class="small text-muted mt-3">
-            {% set active_count = queue_stats.queued + queue_stats.running %}
-            {% if active_count > 0 %}
-            当前还有 {{ active_count }} 个任务处在队列或执行中，刷新列表即可继续追踪状态变化。
-            {% else %}
-            当前没有排队中的任务，可以直接提交新的执行计划。
-            {% endif %}
+        <div class="module-list-tools">
+            <span class="module-side-badge">当前项目：{{ selected_project_name }}</span>
         </div>
     </div>
-</div>
-
-<div class="row g-3 mb-4">
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">计划总数</div>
-            <div class="stat-value">{{ queue_stats.total }}</div>
-            <div class="text-muted small mt-2">当前可见的执行计划总量</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">排队 / 执行中</div>
-            <div class="stat-value">{{ queue_stats.queued }} / {{ queue_stats.running }}</div>
-            <div class="text-muted small mt-2">等待 Worker 或正在运行的任务</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">成功 / 失败</div>
-            <div class="stat-value">{{ queue_stats.passed }} / {{ queue_stats.failed }}</div>
-            <div class="text-muted small mt-2">已结束任务的结果分布</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">脚本 / 环境</div>
-            <div class="stat-value">{{ queue_stats.scripts }} / {{ queue_stats.environments }}</div>
-            <div class="text-muted small mt-2">当前项目可用于执行的资源数量</div>
-        </div>
-    </div>
-</div>
-
-{% if projects|length > 1 %}
-<div class="card mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <strong>项目切换</strong>
-        <small class="text-muted">切换后会重新加载脚本和环境</small>
-    </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('ui_auto.executions_page') }}" class="d-flex flex-wrap gap-3 align-items-center">
-            <div class="input-group" style="width:auto; min-width: 260px;">
-                <span class="input-group-text bg-light text-muted">项目</span>
-                <select class="form-select" name="project_id" onchange="this.form.submit()">
-                    <option value="">请选择项目</option>
-                    {% for project in projects %}
-                    <option value="{{ project.id }}" {% if selected_project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <noscript><button class="btn btn-primary" type="submit">切换</button></noscript>
-        </form>
-    </div>
-</div>
-{% endif %}
-
-<div class="card mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <strong>执行配置</strong>
-        <small class="text-muted">选择脚本、环境、浏览器和重试策略</small>
-    </div>
-    <div class="card-body">
+    <div class="card-body module-filter-body">
         {% if scripts and environments %}
-        <form method="post" action="{{ url_for('ui_auto.create_execution') }}">
+        <form method="post" action="{{ url_for('ui_auto.create_execution') }}" class="execution-config-form">
             <input type="hidden" name="project_id" value="{{ selected_project_id or '' }}">
             <div class="row g-3">
                 <div class="col-lg-4 col-md-6">
@@ -137,56 +148,58 @@
                         <option value="chrome">Chrome</option>
                     </select>
                 </div>
-                <div class="col-lg-2 col-md-6">
-                    <label class="form-label">执行模式</label>
-                    <select class="form-select" name="run_mode">
-                        <option value="manual">手动</option>
-                        <option value="scheduled">定时</option>
-                        <option value="api">API 触发</option>
-                        <option value="ai_triggered">AI 触发</option>
-                    </select>
-                </div>
                 <div class="col-lg-2 col-md-4">
                     <label class="form-label">最大重试</label>
                     <input type="number" class="form-control" name="max_retry" value="0" min="0" max="5">
                 </div>
-                <div class="col-lg-4 col-md-8">
-                    <label class="form-label">触发来源</label>
-                    <input class="form-control" name="trigger_source" value="ui" placeholder="ui / api / ai / cron">
-                </div>
-                <div class="col-12 d-flex justify-content-end gap-2">
+                <div class="col-12 execution-config-actions">
                     <button class="btn btn-outline-secondary" type="reset">重置</button>
                     {% if has_permission('uiauto:script:run') %}
-                    <button class="btn btn-primary" type="submit"><i class="bi bi-play-fill me-1"></i>提交执行计划</button>
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-play-fill me-1"></i>
+                        提交执行计划
+                    </button>
                     {% endif %}
                 </div>
             </div>
         </form>
         {% else %}
-        <div class="empty-box">当前项目下还没有脚本或环境，请先到脚本管理和环境管理补齐基础数据。</div>
+        <div class="empty-box">
+            当前项目下还没有脚本或环境，请先到脚本管理和环境管理补齐基础数据。
+        </div>
         {% endif %}
     </div>
-</div>
+</section>
+{% endblock %}
 
-<div class="card">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <strong>最近执行</strong>
-        <small class="text-muted">仅展示最近 20 条计划记录</small>
+{% block workspace_list %}
+<section class="card module-list-card execution-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>最近执行</strong>
+            <small class="text-muted ms-2">仅展示最近 {{ runs|length }} 条执行记录</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-side-badge">活跃队列 {{ active_count }}</span>
+            <span class="module-side-badge">已完成 {{ finished_count }}</span>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('ui_auto.replays_page') }}">查看回放</a>
+        </div>
     </div>
     <div class="card-body p-0">
         {% if runs %}
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-responsive execution-table-wrap">
+            <table class="table table-hover align-middle mb-0 execution-table">
                 <thead class="table-light">
                     <tr>
                         <th style="width: 10%;">状态</th>
-                        <th style="width: 17%;">脚本</th>
-                        <th style="width: 14%;">环境</th>
-                        <th style="width: 9%;">浏览器</th>
-                        <th style="width: 9%;">模式</th>
-                        <th style="width: 10%;">重试 / 耗时</th>
-                        <th style="width: 13%;">创建时间</th>
-                        <th style="width: 18%;">操作</th>
+                        <th style="width: 19%;">脚本</th>
+                        <th style="width: 18%;">环境</th>
+                        <th style="width: 8%;">浏览器</th>
+                        <th style="width: 9%;">触发类型</th>
+                        <th style="width: 9%;">触发人员</th>
+                        <th style="width: 11%;">重试 / 耗时</th>
+                        <th style="width: 14%;">创建时间</th>
+                        <th style="width: 12%;">操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -198,7 +211,7 @@
                             {% elif run.status == 'running' %}
                             <span class="badge bg-primary">执行中</span>
                             {% elif run.status == 'passed' %}
-                            <span class="badge bg-success">通过</span>
+                            <span class="badge bg-success">成功</span>
                             {% elif run.status == 'failed' %}
                             <span class="badge bg-danger">失败</span>
                             {% elif run.status == 'timeout' %}
@@ -207,33 +220,36 @@
                             <span class="badge bg-secondary">{{ run.status }}</span>
                             {% endif %}
                             {% if run.error_message %}
-                            <div class="small text-danger text-truncate mt-1" style="max-width: 150px;" title="{{ run.error_message }}">{{ run.error_stage or 'error' }}</div>
+                            <div class="small text-danger text-truncate mt-1 execution-error-text" title="{{ run.error_message }}">
+                                {{ run.error_stage or 'error' }}
+                            </div>
                             {% endif %}
                         </td>
                         <td>
-                            <div class="fw-semibold">{{ run.script.name if run.script else '-' }}</div>
+                            <div class="fw-semibold text-truncate" title="{{ run.script.name if run.script else '-' }}">{{ run.script.name if run.script else '-' }}</div>
                             <small class="text-muted">{{ run.script.code if run.script else '-' }}</small>
                         </td>
                         <td>
-                            <div class="fw-semibold">{{ run.summary.get('environment_name', '-') }}</div>
-                            <small class="text-muted">{{ run.summary.get('environment_base_url', '') }}</small>
+                            <div class="fw-semibold text-truncate" title="{{ run.summary.get('environment_name', '-') }}">{{ run.summary.get('environment_name', '-') }}</div>
+                            <small class="text-muted text-truncate d-block" title="{{ run.summary.get('environment_base_url', '') }}">{{ run.summary.get('environment_base_url', '') }}</small>
                         </td>
                         <td>{{ run.browser_type }}</td>
-                        <td>{{ run.run_mode }}</td>
+                        <td>{{ run.trigger_type_label }}</td>
+                        <td>{{ run.trigger_person_name }}</td>
                         <td>
-                            <div>{{ run.retry_count }} / {{ run.max_retry }}</div>
+                            <div class="fw-semibold">{{ run.retry_count }} / {{ run.max_retry }}</div>
                             <small class="text-muted">{{ run.duration_ms }} ms</small>
                         </td>
                         <td>{{ run.created_at|bjt }}</td>
                         <td>
-                            <div class="d-flex flex-wrap gap-2">
+                            <div class="d-flex flex-nowrap gap-2 execution-row-actions">
                                 <a class="btn btn-sm btn-outline-primary" href="{{ url_for('ui_auto.replay_detail_page', run_id=run.id) }}">
-                                    <i class="bi bi-eye me-1"></i>查看详情
+                                    查看详情
                                 </a>
                                 {% if has_permission('uiauto:script:run') and run.status in ['queued', 'failed', 'timeout'] %}
-                                <form method="post" action="{{ url_for('ui_auto.execute_run', run_id=run.id) }}">
+                                <form method="post" action="{{ url_for('ui_auto.execute_run', run_id=run.id) }}" class="d-inline">
                                     <button class="btn btn-sm btn-primary" type="submit">
-                                        <i class="bi bi-play-fill me-1"></i>{{ '重新执行' if run.status in ['failed', 'timeout'] else '立即执行' }}
+                                        {{ '重新执行' if run.status in ['failed', 'timeout'] else '立即执行' }}
                                     </button>
                                 </form>
                                 {% endif %}
@@ -266,5 +282,99 @@
         <div class="empty-box m-3">暂无执行计划记录，先提交一个 UI 自动化任务。</div>
         {% endif %}
     </div>
-</div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>队列概览</strong>
+        <a href="{{ url_for('ui_auto.replays_page') }}">查看回放</a>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-0"><i class="bi bi-clock-history"></i></span>
+                <div>
+                    <strong>排队中</strong>
+                    <small>{{ queue_stats.queued }}</small>
+                </div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-1"><i class="bi bi-play-circle"></i></span>
+                <div>
+                    <strong>执行中</strong>
+                    <small>{{ queue_stats.running }}</small>
+                </div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-2"><i class="bi bi-check2-circle"></i></span>
+                <div>
+                    <strong>已完成</strong>
+                    <small>{{ finished_count }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            <a class="module-quick-item" href="{{ url_for('ui_auto.scripts_page') }}">
+                <i class="bi bi-file-earmark-code"></i>
+                <span>脚本管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.locators_page') }}">
+                <i class="bi bi-crosshair"></i>
+                <span>定位器库</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.replays_page') }}">
+                <i class="bi bi-play-btn"></i>
+                <span>报告回放</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.index') }}">
+                <i class="bi bi-grid-1x2"></i>
+                <span>自动化总览</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="{{ url_for('ui_auto.replays_page') }}">
+                <span class="module-insight-icon icon-0"><i class="bi bi-bar-chart"></i></span>
+                <div>
+                    <strong>优先处理失败与超时</strong>
+                    <small>先看异常，再看排队和执行中的任务。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('ui_auto.scripts_page') }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-magic"></i></span>
+                <div>
+                    <strong>回到脚本版本修复</strong>
+                    <small>定位到具体脚本后再回溯版本与变更。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('ui_auto.locators_page') }}">
+                <span class="module-insight-icon icon-2"><i class="bi bi-bullseye"></i></span>
+                <div>
+                    <strong>检查定位器稳定性</strong>
+                    <small>执行失败时先确认页面定位是否变化。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
 {% endblock %}

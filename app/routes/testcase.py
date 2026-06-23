@@ -1,9 +1,11 @@
 import json
+from datetime import datetime, timedelta
 
 from flask import Blueprint, render_template, request
+from sqlalchemy.orm import joinedload
 
 from app import db
-from app.models import TestCase
+from app.models import ExecutionDetail, TestCase
 from app.project_context import resolve_project_id
 from app.routes import catch_service_error_json, handle_page_error, handle_success, json_success
 from app.services.base_service import ServiceError
@@ -16,7 +18,10 @@ testcase_bp = Blueprint("testcase", __name__, url_prefix="/testcases")
 
 @testcase_bp.route("/")
 def list_testcases():
+    projects = ProjectService.list_all()
     project_id = resolve_project_id()
+    if project_id is None and projects:
+        project_id = projects[0].id
     module_id = request.args.get("module_id", type=int)
     interface_name = request.args.get("interface_name", "").strip()
     interface_url = request.args.get("interface_url", "").strip()
@@ -30,25 +35,41 @@ def list_testcases():
         page=page,
         per_page=10,
     )
-    projects = ProjectService.list_all()
     modules = ModuleService.list_all(project_id=project_id) if project_id else []
+    testcase_total = sum(len(module.testcases) for module in modules)
+    active_module_total = sum(1 for module in modules if module.testcases)
+    pending_module_total = max(len(modules) - active_module_total, 0)
+    recent_module_total = sum(
+        1
+        for module in modules
+        if module.updated_at and module.updated_at >= datetime.utcnow() - timedelta(days=7)
+    )
 
     return render_template(
         "testcases/list.html",
         pagination=pagination,
         projects=projects,
         modules=modules,
+        testcase_total=testcase_total,
+        module_total=len(modules),
+        active_module_total=active_module_total,
+        pending_module_total=pending_module_total,
+        recent_module_total=recent_module_total,
         selected_project_id=project_id,
         selected_module_id=module_id,
         selected_interface_name=interface_name,
         selected_interface_url=interface_url,
+        recent_cutoff=datetime.utcnow() - timedelta(days=7),
     )
 
 
 @testcase_bp.route("/create")
 def create_testcase_page():
     projects = ProjectService.list_all()
-    modules = ModuleService.list_all()
+    selected_project_id = resolve_project_id()
+    if selected_project_id is None and projects:
+        selected_project_id = projects[0].id
+    modules = ModuleService.list_all(project_id=selected_project_id) if selected_project_id else []
     default_case = {
         "name": "登录成功",
         "method": "POST",
@@ -73,6 +94,8 @@ def create_testcase_page():
         testcase=None,
         projects=projects,
         modules=modules,
+        selected_project_id=selected_project_id,
+        selected_module_id=modules[0].id if modules else None,
         case_json=json.dumps(default_case, ensure_ascii=False, indent=2),
     )
 
@@ -94,6 +117,72 @@ def create_testcase():
         return handle_page_error(str(exc), "testcase.create_testcase_page")
 
 
+@testcase_bp.route("/<int:testcase_id>")
+def detail_testcase_page(testcase_id):
+    try:
+        testcase = TestCaseService.get_by_id(testcase_id)
+    except ServiceError as exc:
+        return handle_page_error(str(exc), "testcase.list_testcases")
+
+    case_data = testcase.data or {}
+    recent_executions = (
+        ExecutionDetail.query.options(joinedload(ExecutionDetail.execution))
+        .filter_by(testcase_id=testcase.id)
+        .order_by(ExecutionDetail.created_at.desc(), ExecutionDetail.id.desc())
+        .limit(5)
+        .all()
+    )
+    execution_count = ExecutionDetail.query.filter_by(testcase_id=testcase.id).count()
+    success_count = sum(1 for detail in recent_executions if detail.status == "passed")
+    failed_count = sum(1 for detail in recent_executions if detail.status == "failed")
+    section_labels = [
+        ("headers", "请求头"),
+        ("params", "查询参数"),
+        ("body", "请求体"),
+        ("extract", "提取规则"),
+        ("assertions", "断言配置"),
+        ("pre_script", "前置脚本"),
+    ]
+    structure_sections = []
+    for key, label in section_labels:
+        value = case_data.get(key)
+        configured = bool(value)
+        if isinstance(value, dict):
+            preview = json.dumps(value, ensure_ascii=False, indent=2)
+            summary = f"{len(value)} 个字段"
+        elif isinstance(value, list):
+            preview = json.dumps(value, ensure_ascii=False, indent=2)
+            summary = f"{len(value)} 条配置"
+        elif value:
+            preview = json.dumps(value, ensure_ascii=False, indent=2) if not isinstance(value, str) else value
+            summary = "已配置"
+        else:
+            preview = "{}" if key != "assertions" else "[]"
+            summary = "未配置"
+        structure_sections.append(
+            {
+                "key": key,
+                "label": label,
+                "summary": summary,
+                "preview": preview,
+                "configured": configured,
+            }
+        )
+
+    return render_template(
+        "testcases/detail.html",
+        testcase=testcase,
+        case_data=case_data,
+        case_json=json.dumps(case_data, ensure_ascii=False, indent=2),
+        recent_executions=recent_executions,
+        execution_count=execution_count,
+        success_count=success_count,
+        failed_count=failed_count,
+        section_count=sum(1 for section in structure_sections if section["configured"]),
+        structure_sections=structure_sections,
+    )
+
+
 @testcase_bp.route("/<int:testcase_id>/edit")
 def edit_testcase_page(testcase_id):
     testcase = TestCaseService.get_by_id(testcase_id)
@@ -105,6 +194,8 @@ def edit_testcase_page(testcase_id):
         testcase=testcase,
         projects=projects,
         modules=modules,
+        selected_project_id=testcase.project_id,
+        selected_module_id=testcase.module_id,
         case_json=testcase.case_data,
     )
 

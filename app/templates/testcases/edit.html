@@ -1,119 +1,327 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
-{% block title %}{{ '编辑用例' if testcase else '新建用例' }}{% endblock %}
-{% block page_title %}{{ '编辑用例' if testcase else '新建用例' }}{% endblock %}
-{% block page_desc %}维护标准接口用例 JSON，支持手工编辑和结构校验{% endblock %}
+{% block title %}{{ "编辑用例" if testcase else "新建用例" }}{% endblock %}
+{% block page_title %}{{ "编辑用例" if testcase else "新建用例" }}{% endblock %}
+{% block page_desc %}维护标准接口用例 JSON，支持手工编辑、结构校验与前置脚本同步{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
-{% block content %}
-<div class="card">
-    <div class="card-header bg-white">
-        <strong>{{ '编辑用例' if testcase else '新建用例' }}</strong>
+{% set workspace_page_class = 'testcase-editor-page' %}
+{% set workspace_layout_class = 'testcase-editor-layout' %}
+{% set workspace_rail_class = 'testcase-editor-rail' %}
+{% set form_action = url_for('testcase.edit_testcase', testcase_id=testcase.id) if testcase else url_for('testcase.create_testcase') %}
+{% set form_project_name = testcase.project.name if testcase and testcase.project else (projects[0].name if projects else '未选择') %}
+{% set form_module_name = testcase.module.name if testcase and testcase.module else (modules[0].name if modules else '未选择') %}
+{% set case_json_text = case_json if case_json else '{}' %}
+
+{% block workspace_heading %}{{ "编辑用例" if testcase else "新建用例" }}{% endblock %}
+{% block workspace_subtitle %}维护标准接口用例 JSON，支持手工编辑、结构校验与前置脚本同步{% endblock %}
+
+{% block workspace_back %}
+<a class="btn btn-outline-secondary module-secondary-btn workspace-back-btn" href="{{ url_for('testcase.list_testcases') }}">
+    <i class="bi bi-arrow-left"></i>
+    返回列表
+</a>
+{% endblock %}
+
+{% block workspace_actions %}
+    {% if has_permission('testcase:create') or has_permission('testcase:edit') %}
+    <button class="btn btn-primary module-primary-btn" type="submit" form="testcaseForm">
+        <i class="bi bi-check2-circle"></i>
+        保存用例
+    </button>
+    {% endif %}
+    <button class="btn btn-outline-primary module-secondary-btn" type="button" id="validateCaseBtnTop">
+        <i class="bi bi-shield-check"></i>
+        校验 JSON
+    </button>
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-folder2"></i></span>
+        <div class="module-metric-copy">
+            <small>所属项目</small>
+            <strong title="{{ form_project_name }}">{{ form_project_name }}</strong>
+            <span>当前用例归属的项目范围</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-box"></i></span>
+        <div class="module-metric-copy">
+            <small>所属模块</small>
+            <strong title="{{ form_module_name }}">{{ form_module_name }}</strong>
+            <span>接口分组与场景组织位置</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-braces-asterisk"></i></span>
+        <div class="module-metric-copy">
+            <small>前置脚本</small>
+            <strong id="preScriptMetric">未启用</strong>
+            <span>发送请求前自动执行的脚本</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-toggle-on"></i></span>
+        <div class="module-metric-copy">
+            <small>启用状态</small>
+            <strong>{{ '启用' if not testcase or testcase.is_active else '停用' }}</strong>
+            <span>决定是否参与回归与执行</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 智能辅助</span>
+            <small>结构同步</small>
+        </div>
+        <p>可在 JSON 与前置脚本之间双向同步，帮助你更快维护用例结构并减少手工修改。</p>
     </div>
-    <div class="card-body">
-        <form method="post" action="{% if testcase %}{{ url_for('testcase.edit_testcase', testcase_id=testcase.id) }}{% else %}{{ url_for('testcase.create_testcase') }}{% endif %}">
-            <div class="row g-3">
-                <div class="col-md-3">
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('ai.parser_page') if has_permission('ai:use') else 'javascript:void(0)' }}">
+        立即体验
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card module-filter-card testcase-editor-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>基础信息</strong>
+            <small>用例的归属、名称、来源和状态</small>
+        </div>
+        <div class="module-list-tools">
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="syncPreScriptBtnTop">
+                <i class="bi bi-arrow-repeat"></i>同步脚本
+            </button>
+        </div>
+    </div>
+    <div class="card-body testcase-editor-body">
+        <form id="testcaseForm" method="post" action="{{ form_action }}" class="testcase-editor-form">
+            {% if testcase %}<input type="hidden" name="project_id" value="{{ testcase.project_id }}">{% endif %}
+            <div class="testcase-editor-grid">
+                <div class="module-field">
                     <label class="form-label">所属项目</label>
                     <select class="form-select" name="project_id" {% if testcase %}disabled{% endif %}>
+                        {% if projects %}
                         {% for project in projects %}
-                        <option value="{{ project.id }}" {% if testcase and testcase.project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
+                        <option value="{{ project.id }}" {% if selected_project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
                         {% endfor %}
+                        {% else %}
+                        <option value="">暂无项目</option>
+                        {% endif %}
                     </select>
-                    {% if testcase %}<input type="hidden" name="project_id" value="{{ testcase.project_id }}">{% endif %}
                 </div>
-                <div class="col-md-3">
+                <div class="module-field">
                     <label class="form-label">所属模块</label>
                     <select class="form-select" name="module_id">
+                        {% if modules %}
                         {% for module in modules %}
-                        <option value="{{ module.id }}" {% if testcase and testcase.module_id == module.id %}selected{% endif %}>{{ module.name }}</option>
+                        <option value="{{ module.id }}" {% if selected_module_id == module.id %}selected{% endif %}>{{ module.name }}</option>
                         {% endfor %}
+                        {% else %}
+                        <option value="">暂无可用模块</option>
+                        {% endif %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="module-field">
                     <label class="form-label">用例名称</label>
                     <input class="form-control" name="name" value="{{ testcase.name if testcase else '' }}" placeholder="请输入用例名称">
                 </div>
-                <div class="col-md-3">
+                <div class="module-field">
                     <label class="form-label">来源</label>
                     <select class="form-select" name="source">
                         <option value="manual" {% if not testcase or testcase.source == 'manual' %}selected{% endif %}>manual</option>
                         <option value="ai" {% if testcase and testcase.source == 'ai' %}selected{% endif %}>ai</option>
                     </select>
                 </div>
-                <div class="col-md-9">
-                    <label class="form-label">描述</label>
-                    <input class="form-control" name="description" value="{{ testcase.description if testcase else '' }}" placeholder="请输入用例描述">
-                </div>
-                <div class="col-md-3">
+                <div class="module-field">
                     <label class="form-label">启用状态</label>
                     <select class="form-select" name="is_active">
                         <option value="1" {% if not testcase or testcase.is_active %}selected{% endif %}>启用</option>
                         <option value="0" {% if testcase and not testcase.is_active %}selected{% endif %}>停用</option>
                     </select>
                 </div>
-                <div class="col-12">
-                    <div class="card border mb-3">
-                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                            <strong>前置脚本</strong>
-                            <small class="text-muted">可在发送请求前执行脚本</small>
-                        </div>
-                        <div class="card-body">
-                            <div class="row g-3">
-                                <div class="col-md-3">
-                                    <label class="form-label">启用前置脚本</label>
-                                    <select class="form-select" id="preScriptEnabled">
-                                        <option value="0">关闭</option>
-                                        <option value="1">启用</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">脚本语言</label>
-                                    <input class="form-control" id="preScriptLanguage" value="python" readonly>
-                                </div>
-                                {% if has_permission('testcase:edit') %}
-                                <div class="col-md-6 d-flex align-items-end gap-2">
-                                    <button class="btn btn-outline-primary btn-sm" type="button" id="syncPreScriptBtn">同步脚本到 JSON</button>
-                                    <button class="btn btn-outline-secondary btn-sm" type="button" id="fillPreScriptExampleBtn">填入示例</button>
-                                </div>
-                                {% endif %}
-                                <div class="col-12">
-                                    <label class="form-label">脚本内容</label>
-                                    <textarea class="form-control json-textarea" id="preScriptContent" placeholder='例如：body["time"] = str(timestamp())'></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label d-flex justify-content-between">
-                            <span>用例 JSON</span>
-                            <small class="text-muted fw-normal">必须符合标准结构</small>
-                        </label>
-                        <textarea class="form-control json-textarea-lg" id="caseDataTextarea" name="case_data">{{ case_json }}</textarea>
-                    </div>
-                </div>
-                <div class="col-12 d-flex gap-2">
-                    {% if has_permission('testcase:edit') %}
-                    <button class="btn btn-success" type="submit">保存用例</button>
-                    <button class="btn btn-outline-primary" type="button" id="validateCaseBtn">校验 JSON</button>
-                    {% endif %}
-                    <a class="btn btn-outline-secondary" href="{{ url_for('testcase.list_testcases') }}">返回列表</a>
+                <div class="module-field testcase-editor-wide">
+                    <label class="form-label">描述</label>
+                    <input class="form-control" name="description" value="{{ testcase.description if testcase else '' }}" placeholder="请输入用例描述">
                 </div>
             </div>
         </form>
     </div>
-</div>
+</section>
+{% endblock %}
 
-<div class="card mt-4 shadow-sm border-0">
-    <div class="card-header bg-light border-bottom-0">
-        <h6 class="mb-0 text-secondary"><i class="bi bi-terminal me-2"></i>校验结果分析</h6>
-    </div>
-    <div class="card-body bg-white rounded-bottom">
-        <div id="validateResult" class="result-box p-3 bg-light rounded" style="min-height: 100px; max-height: 600px; overflow-y: auto;">
-            <div class="text-muted text-center mt-3"><i class="bi bi-info-circle me-2"></i>点击“校验 JSON”查看详细结构分析</div>
+{% block workspace_list %}
+<section class="card module-list-card testcase-json-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>用例 JSON</strong>
+            <small>可直接编辑结构，支持前置脚本同步与结构校验</small>
+        </div>
+        <div class="module-list-tools">
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="fillPreScriptExampleBtn">
+                <i class="bi bi-magic"></i>填入示例
+            </button>
         </div>
     </div>
-</div>
+    <div class="card-body testcase-json-body">
+        <div class="testcase-json-grid">
+            <div class="testcase-json-main">
+                <div class="testcase-script-card">
+                    <div class="testcase-script-header">
+                        <div>
+                            <strong>前置脚本</strong>
+                            <small>在请求发出前自动执行</small>
+                        </div>
+                        <label class="testcase-script-switch">
+                            <span>启用</span>
+                            <select class="form-select form-select-sm" id="preScriptEnabled" form="testcaseForm">
+                                <option value="0">关闭</option>
+                                <option value="1">启用</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="testcase-script-grid">
+                        <div class="module-field">
+                            <label class="form-label">脚本语言</label>
+                            <input class="form-control" id="preScriptLanguage" value="python" readonly>
+                        </div>
+                        <div class="module-field testcase-script-actions">
+                            <button class="btn btn-outline-primary" type="button" id="syncPreScriptBtn">同步脚本到 JSON</button>
+                            <button class="btn btn-outline-secondary" type="button" id="validateCaseBtnInline">校验 JSON</button>
+                        </div>
+                        <div class="module-field testcase-script-wide">
+                            <label class="form-label">脚本内容</label>
+                            <textarea class="form-control json-textarea" id="preScriptContent" placeholder='例如：body["time"] = str(timestamp())' form="testcaseForm"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testcase-json-editor">
+                    <label class="form-label d-flex justify-content-between align-items-center">
+                        <span>用例 JSON</span>
+                        <small class="text-muted fw-normal">提交前请确认结构正确</small>
+                    </label>
+                    <textarea class="form-control json-textarea-lg" id="caseDataTextarea" name="case_data" form="testcaseForm">{{ case_json_text | e }}</textarea>
+                </div>
+            </div>
+
+            <div class="testcase-json-side">
+                <div class="testcase-result-card">
+                    <div class="testcase-result-header">
+                        <strong>校验结果</strong>
+                        <span>结构分析</span>
+                    </div>
+                    <div id="validateResult" class="result-box testcase-result-box">
+                        <div class="text-muted text-center mt-3">
+                            <i class="bi bi-info-circle me-2"></i>点击“校验 JSON”查看详细结果
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testcase-help-card">
+                    <div class="module-side-header">
+                        <strong>快捷入口</strong>
+                    </div>
+                    <div class="card-body module-side-body">
+                        <div class="module-quick-grid">
+                            <a class="module-quick-item" href="{{ url_for('testcase.list_testcases') }}">
+                                <i class="bi bi-list-check"></i>
+                                <span>返回列表</span>
+                            </a>
+                            <a class="module-quick-item" href="{{ url_for('module.list_modules') }}">
+                                <i class="bi bi-box"></i>
+                                <span>模块管理</span>
+                            </a>
+                            <a class="module-quick-item" href="{{ url_for('execution.run_page') }}">
+                                <i class="bi bi-play-circle"></i>
+                                <span>执行中心</span>
+                            </a>
+                            <a class="module-quick-item" href="{{ url_for('scenario.list_scenarios') }}">
+                                <i class="bi bi-bezier2"></i>
+                                <span>场景管理</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>填写提示</strong>
+        <a href="{{ url_for('ai.parser_page') if has_permission('ai:use') else 'javascript:void(0)' }}">AI 解析</a>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="{{ url_for('ai.parser_page') if has_permission('ai:use') else 'javascript:void(0)' }}">
+                <span class="module-insight-icon icon-0"><i class="bi bi-file-earmark-code"></i></span>
+                <div>
+                    <strong>从接口文档生成用例</strong>
+                    <small>先解析接口结构，再补全断言和请求体</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('module.list_modules') }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-diagram-3"></i></span>
+                <div>
+                    <strong>按模块收敛用例结构</strong>
+                    <small>让目录、列表和执行入口保持一致</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>当前状态</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="testcase-state-list">
+            <div class="testcase-state-item">
+                <span>项目</span>
+                <strong>{{ form_project_name }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>模块</span>
+                <strong>{{ form_module_name }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>来源</span>
+                <strong>{{ testcase.source if testcase else 'manual' }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>状态</span>
+                <strong>{{ '启用' if not testcase or testcase.is_active else '停用' }}</strong>
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %}
 
 {% block scripts %}
@@ -123,20 +331,45 @@ const validateResult = document.getElementById("validateResult");
 const preScriptEnabled = document.getElementById("preScriptEnabled");
 const preScriptLanguage = document.getElementById("preScriptLanguage");
 const preScriptContent = document.getElementById("preScriptContent");
-const testcaseForm = document.querySelector("form");
+const testcaseForm = document.getElementById("testcaseForm");
+const preScriptMetric = document.getElementById("preScriptMetric");
 const PRE_SCRIPT_EXAMPLES = {
     sign: 'body["time"] = str(timestamp())\nbody["sign"] = md5(body["context"] + env["secret"])\nruntime_vars["last_sign"] = body["sign"]',
     nonce: 'body["nonce"] = uuid4()\nruntime_vars["nonce"] = body["nonce"]',
     auth_header: 'runtime_vars["access_token"] = env["access_token"]\nheaders["Authorization"] = "Bearer " + runtime_vars["access_token"]'
 };
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+}
+
 function showResultHtml(elementId, htmlContent) {
     const el = document.getElementById(elementId);
-    if (el) el.innerHTML = htmlContent;
+    if (el) {
+        el.innerHTML = htmlContent;
+    }
 }
+
 function normalizePreScript(preScript) {
     const config = preScript && typeof preScript === "object" ? preScript : {};
-    return { enabled: Boolean(config.enabled), language: config.language || "python", template_id: config.template_id || null, content: config.content || "" };
+    return {
+        enabled: Boolean(config.enabled),
+        language: config.language || "python",
+        template_id: config.template_id || null,
+        content: config.content || ""
+    };
 }
+
+function updatePreScriptMetric() {
+    if (!preScriptMetric) return;
+    preScriptMetric.textContent = preScriptEnabled.value === "1" ? "已启用" : "未启用";
+}
+
 function loadPreScriptFromJson() {
     try {
         const caseJson = JSON.parse(caseDataTextarea.value || "{}");
@@ -149,44 +382,91 @@ function loadPreScriptFromJson() {
         preScriptLanguage.value = "python";
         preScriptContent.value = "";
     }
+    updatePreScriptMetric();
 }
+
 function syncPreScriptToJson() {
     let caseJson;
     try {
         caseJson = JSON.parse(caseDataTextarea.value || "{}");
     } catch (error) {
-        showResultHtml("validateResult", `<div class="text-danger"><i class="bi bi-x-circle-fill me-2"></i>当前用例 JSON 不是合法格式，无法同步前置脚本。</div>`);
+        showResultHtml("validateResult", '<div class="text-danger"><i class="bi bi-x-circle-fill me-2"></i>当前用例 JSON 不是合法格式，无法同步前置脚本。</div>');
         return false;
     }
-    caseJson.pre_script = { enabled: preScriptEnabled.value === "1", language: preScriptLanguage.value || "python", template_id: null, content: preScriptContent.value };
+
+    caseJson.pre_script = {
+        enabled: preScriptEnabled.value === "1",
+        language: preScriptLanguage.value || "python",
+        template_id: null,
+        content: preScriptContent.value
+    };
     caseDataTextarea.value = JSON.stringify(caseJson, null, 2);
+    updatePreScriptMetric();
     return true;
 }
-{% if has_permission('testcase:edit') %}
-document.getElementById("syncPreScriptBtn").addEventListener("click", function () {
+
+async function validateCaseJson() {
+    if (!syncPreScriptToJson()) return;
+
+    try {
+        const result = await postJson("{{ url_for('testcase.validate_case_json') }}", {
+            case_data: caseDataTextarea.value
+        });
+        const renderedData = escapeHtml(JSON.stringify(result.data, null, 2));
+        showResultHtml(
+            "validateResult",
+            `<div class="text-success mb-3"><i class="bi bi-check-circle-fill me-2"></i>校验通过</div><pre class="mt-2 p-3 bg-light rounded"><code>${renderedData}</code></pre>`
+        );
+    } catch (error) {
+        showResultHtml(
+            "validateResult",
+            `<div class="text-danger"><i class="bi bi-x-circle-fill me-2"></i>校验失败：${escapeHtml(error.message)}</div>`
+        );
+    }
+}
+
+function bindClick(id, handler) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.addEventListener("click", handler);
+    }
+}
+
+bindClick("syncPreScriptBtn", () => {
     if (syncPreScriptToJson()) {
-        showResultHtml("validateResult", `<div class="text-success"><i class="bi bi-check-circle-fill me-2"></i>前置脚本已同步到用例 JSON。</div>`);
+        showResultHtml("validateResult", '<div class="text-success"><i class="bi bi-check-circle-fill me-2"></i>前置脚本已同步到用例 JSON。</div>');
     }
 });
-document.getElementById("fillPreScriptExampleBtn").addEventListener("click", function () {
+
+bindClick("syncPreScriptBtnTop", () => {
+    if (syncPreScriptToJson()) {
+        showResultHtml("validateResult", '<div class="text-success"><i class="bi bi-check-circle-fill me-2"></i>前置脚本已同步到用例 JSON。</div>');
+    }
+});
+
+bindClick("fillPreScriptExampleBtn", () => {
     preScriptEnabled.value = "1";
     preScriptContent.value = PRE_SCRIPT_EXAMPLES.sign;
+    updatePreScriptMetric();
     syncPreScriptToJson();
-    showResultHtml("validateResult", `<div class="text-success"><i class="bi bi-info-circle-fill me-2"></i>已填入前置脚本示例。</div>`);
+    showResultHtml("validateResult", '<div class="text-success"><i class="bi bi-info-circle-fill me-2"></i>已填入前置脚本示例。</div>');
 });
-document.getElementById("validateCaseBtn").addEventListener("click", async function () {
-    if (!syncPreScriptToJson()) return;
-    try {
-        const result = await postJson("{{ url_for('testcase.validate_case_json') }}", { case_data: caseDataTextarea.value });
-        showResultHtml("validateResult", `<div class="text-success mb-3"><i class="bi bi-check-circle-fill me-2"></i>校验通过</div><pre class="mt-2 p-3 bg-light rounded"><code>${JSON.stringify(result.data, null, 2)}</code></pre>`);
-    } catch (error) {
-        showResultHtml("validateResult", `<div class="text-danger"><i class="bi bi-x-circle-fill me-2"></i>校验失败：${error.message}</div>`);
-    }
-});
-testcaseForm.addEventListener("submit", function (event) {
-    if (!syncPreScriptToJson()) event.preventDefault();
-});
-{% endif %}
+
+bindClick("validateCaseBtnTop", validateCaseJson);
+bindClick("validateCaseBtnInline", validateCaseJson);
+
+if (testcaseForm) {
+    testcaseForm.addEventListener("submit", function (event) {
+        if (!syncPreScriptToJson()) {
+            event.preventDefault();
+        }
+    });
+}
+
+if (preScriptEnabled) {
+    preScriptEnabled.addEventListener("change", updatePreScriptMetric);
+}
+
 loadPreScriptFromJson();
 </script>
 {% endblock %}

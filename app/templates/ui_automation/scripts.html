@@ -1,18 +1,141 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}UI 脚本管理{% endblock %}
 {% block page_title %}UI 脚本管理{% endblock %}
 {% block page_desc %}脚本中心管理 Python + Playwright 自动化脚本，支持创建、编辑、版本和执行入口。{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
-{% block content %}
-<div class="card mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <strong>筛选条件</strong>
-        <small class="text-muted">按名称、编码和状态进行筛选</small>
+{% set workspace_page_class = 'ui-automation-scripts-page' %}
+
+{% set script_stats = namespace(total=0, active=0, ai=0, versions=0) %}
+{% for row in scripts %}
+    {% set script_stats.total = script_stats.total + 1 %}
+    {% if row.script.status == 'active' %}
+        {% set script_stats.active = script_stats.active + 1 %}
+    {% endif %}
+    {% if row.current_version and row.current_version.ai_generated %}
+        {% set script_stats.ai = script_stats.ai + 1 %}
+    {% endif %}
+    {% set script_stats.versions = script_stats.versions + row.version_count %}
+{% endfor %}
+
+{% block workspace_heading %}UI 脚本管理{% endblock %}
+{% block workspace_subtitle %}脚本中心管理 Python + Playwright 自动化脚本，支持创建、编辑、版本和执行入口。{% endblock %}
+
+{% block workspace_actions %}
+    {% if has_permission('uiauto:script:create') %}
+    <button
+        class="btn btn-primary module-primary-btn"
+        type="button"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#scriptDrawer"
+        data-mode="create"
+        data-form-action="{{ url_for('ui_auto.create_script') }}"
+        data-title="新建脚本">
+        <i class="bi bi-plus-lg"></i>
+        新建脚本
+    </button>
+    <button
+        class="btn btn-outline-info module-secondary-btn"
+        type="button"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#aiScriptDrawer">
+        <i class="bi bi-stars"></i>
+        AI 生成
+    </button>
+    <button
+        class="btn btn-outline-secondary module-secondary-btn"
+        type="button"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#batchImportDrawer">
+        <i class="bi bi-upload"></i>
+        批量导入
+    </button>
+    <button
+        class="btn btn-outline-primary module-secondary-btn"
+        type="button"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#batchGenerateDrawer">
+        <i class="bi bi-magic"></i>
+        批量生成
+    </button>
+    {% endif %}
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-file-earmark-code"></i></span>
+        <div class="module-metric-copy">
+            <small>脚本总数</small>
+            <strong>{{ script_stats.total }}</strong>
+            <span>当前项目下可见脚本</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-check2-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>启用中</small>
+            <strong>{{ script_stats.active }}</strong>
+            <span>可直接用于执行和回归</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-stars"></i></span>
+        <div class="module-metric-copy">
+            <small>AI 生成</small>
+            <strong>{{ script_stats.ai }}</strong>
+            <span>来自 AI 生成或修复版本</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-journal-code"></i></span>
+        <div class="module-metric-copy">
+            <small>版本总数</small>
+            <strong>{{ script_stats.versions }}</strong>
+            <span>累计沉淀的历史版本</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 智能辅助</span>
+            <small>全新升级</small>
+        </div>
+        <p>自动解析脚本结构、结合定位器上下文生成脚本骨架，帮助你更快完成脚本录入和修复。</p>
     </div>
-    <div class="card-body">
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('ui_auto.locators_page') }}">
+        去定位器库
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card module-filter-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>筛选条件</strong>
+            <small class="text-muted ms-2">按名称、编码和状态进行筛选</small>
+        </div>
         {% if has_permission('uiauto:script:create') %}
-        <div class="d-flex flex-wrap justify-content-end gap-2 mb-3">
+        <div class="module-list-tools">
             <button
                 class="btn btn-outline-primary btn-sm"
                 type="button"
@@ -23,29 +146,19 @@
                 data-title="新建脚本">
                 新建脚本
             </button>
-            <button
-                class="btn btn-outline-info btn-sm"
-                type="button"
-                data-bs-toggle="offcanvas"
-                data-bs-target="#aiScriptDrawer">
+            <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#aiScriptDrawer">
                 AI 生成
             </button>
-            <button
-                class="btn btn-outline-secondary btn-sm"
-                type="button"
-                data-bs-toggle="offcanvas"
-                data-bs-target="#batchImportDrawer">
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#batchImportDrawer">
                 批量导入
             </button>
-            <button
-                class="btn btn-primary btn-sm"
-                type="button"
-                data-bs-toggle="offcanvas"
-                data-bs-target="#batchGenerateDrawer">
+            <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#batchGenerateDrawer">
                 批量生成
             </button>
         </div>
         {% endif %}
+    </div>
+    <div class="card-body">
         <form method="get" action="{{ url_for('ui_auto.scripts_page') }}" class="d-flex flex-wrap align-items-center gap-3">
             <div class="input-group" style="width: auto; min-width: 260px;">
                 <span class="input-group-text bg-light text-muted">关键词</span>
@@ -67,12 +180,21 @@
             </div>
         </form>
     </div>
-</div>
+</section>
+{% endblock %}
 
-<div class="card">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <strong>脚本列表</strong>
-        <small class="text-muted">当前共 {{ scripts|length }} 条脚本</small>
+{% block workspace_list %}
+<section class="card module-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>脚本列表</strong>
+            <small class="text-muted ms-2">当前共 {{ scripts|length }} 条脚本</small>
+        </div>
+        <div class="module-list-tools">
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('ui_auto.locators_page') }}">定位器库</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('ui_auto.executions_page') }}">执行计划</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('ui_auto.replays_page') }}">报告回放</a>
+        </div>
     </div>
     <div class="card-body p-0">
         {% if scripts %}
@@ -133,7 +255,7 @@
                         </td>
                         <td>{{ script.updated_at|bjt }}</td>
                         <td>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 flex-wrap">
                                 {% if has_permission('uiauto:script:edit') %}
                                 <button
                                     class="btn btn-sm btn-outline-primary"
@@ -186,8 +308,92 @@
         <div class="empty-box m-3">暂无 UI 脚本，先创建一个 Python + Playwright 脚本吧。</div>
         {% endif %}
     </div>
-</div>
+</section>
+{% endblock %}
 
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>最近脚本</strong>
+        <a href="{{ url_for('ui_auto.scripts_page') }}">查看全部</a>
+    </div>
+    <div class="card-body module-side-body">
+        {% if scripts %}
+        <div class="module-insight-list">
+            {% for row in scripts[:4] %}
+            <a class="module-insight-item" href="{{ url_for('ui_auto.script_versions_page', script_id=row.script.id) }}">
+                <span class="module-insight-icon icon-{{ loop.index0 % 4 }}">
+                    <i class="bi bi-file-earmark-code"></i>
+                </span>
+                <div>
+                    <strong>{{ row.script.name }}</strong>
+                    <small>{{ row.script.code }} · {{ row.script.updated_at|bjt }}</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="module-rail-empty">暂无脚本记录</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            <a class="module-quick-item" href="{{ url_for('ui_auto.locators_page') }}">
+                <i class="bi bi-crosshair"></i>
+                <span>定位器库</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.executions_page') }}">
+                <i class="bi bi-calendar2-event"></i>
+                <span>执行计划</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.replays_page') }}">
+                <i class="bi bi-play-btn"></i>
+                <span>报告回放</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.index') }}">
+                <i class="bi bi-grid-1x2"></i>
+                <span>自动化总览</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+        <button class="module-side-refresh" type="button">换一批</button>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="{{ url_for('ui_auto.locators_page') }}">
+                <span class="module-insight-icon icon-0"><i class="bi bi-crosshair"></i></span>
+                <div>
+                    <strong>优先沉淀稳定定位器</strong>
+                    <small>把高频变动元素先收敛成可复用上下文。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('ai.parser_page') }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-stars"></i></span>
+                <div>
+                    <strong>从页面生成脚本骨架</strong>
+                    <small>先解析常用页面，再让 AI 生成脚本初稿。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_drawers %}
 {% if has_permission('uiauto:script:create') or has_permission('uiauto:script:edit') %}
 <div class="offcanvas offcanvas-end app-edit-drawer" tabindex="-1" id="scriptDrawer" aria-labelledby="scriptDrawerLabel">
     <div class="offcanvas-header">
@@ -258,29 +464,25 @@
                     </div>
                     <div class="col-12">
                         <label class="form-label">描述</label>
-                        <input class="form-control" name="description" id="scriptDescription" placeholder="脚本用途说明">
+                        <textarea class="form-control" name="description" id="scriptDescription" rows="3" placeholder="脚本用途、覆盖场景和维护说明"></textarea>
                     </div>
-                </div>
-            </div>
-
-            <div class="drawer-section">
-                <div class="drawer-section-title">脚本内容</div>
-                <textarea class="form-control json-textarea-lg" name="script_content" id="scriptContent" rows="18" spellcheck="false"></textarea>
-            </div>
-
-            <div class="drawer-section">
-                <div class="drawer-section-title">版本说明</div>
-                <div class="row g-3">
                     <div class="col-md-8">
                         <label class="form-label">变更说明</label>
                         <input class="form-control" name="change_summary" id="scriptChangeSummary" value="内容更新" placeholder="例如 新增登录断言">
                     </div>
+                    <div class="col-12">
+                        <label class="form-label">脚本内容</label>
+                        <textarea class="form-control font-monospace" name="script_content" id="scriptContent" rows="12" placeholder="{{ default_script_template }}"></textarea>
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label">AI Prompt</label>
+                        <textarea class="form-control" name="ai_prompt" id="scriptAiPrompt" rows="3" placeholder="记录本次生成或修复的提示词"></textarea>
+                    </div>
                 </div>
             </div>
-
-            <div class="d-flex justify-content-end gap-2 pt-2">
+            <div class="drawer-actions">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
-                <button type="submit" class="btn btn-primary">保存脚本</button>
+                <button class="btn btn-primary" type="submit">保存脚本</button>
             </div>
         </form>
     </div>
@@ -292,37 +494,19 @@
     <div class="offcanvas-header">
         <div>
             <h5 class="offcanvas-title mb-1" id="batchImportDrawerLabel">批量导入脚本</h5>
-            <div class="text-muted small">支持粘贴 JSON 数组，一次创建多条脚本和首版内容。</div>
+            <div class="text-muted small">支持 JSON 批量导入多个脚本定义。</div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
     </div>
     <div class="offcanvas-body">
         <form method="post" action="{{ url_for('ui_auto.batch_import_scripts') }}">
-            {% if current_project_id %}
-            <input type="hidden" name="project_id" value="{{ current_project_id }}">
-            {% else %}
             <div class="drawer-section">
-                <div class="drawer-section-title">选择项目</div>
-                <select class="form-select" name="project_id" required>
-                    <option value="">请选择项目</option>
-                    {% for project in global_projects %}
-                    <option value="{{ project.id }}">{{ project.name }}</option>
-                    {% endfor %}
-                </select>
+                <div class="drawer-section-title">脚本 JSON</div>
+                <textarea class="form-control font-monospace" name="batch_scripts_json" rows="18" placeholder='[{"name":"登录校验","code":"login_check"}]'></textarea>
             </div>
-            {% endif %}
-            <div class="drawer-section">
-                <div class="drawer-section-title">导入内容</div>
-                <textarea
-                    class="form-control json-textarea-lg"
-                    name="batch_scripts_json"
-                    rows="18"
-                    placeholder='[{"name":"登录脚本","code":"login_smoke","script_content":"from playwright.sync_api import expect\\n\\ndef test_login(page, base_url):\\n    ...","status":"draft","entry_file":"tests/test_login.py"}]'></textarea>
-                <div class="form-text mt-2">字段支持：name、code、description、status、tags、entry_file、script_content、owner_id。</div>
-            </div>
-            <div class="d-flex justify-content-end gap-2 pt-2">
+            <div class="drawer-actions">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
-                <button type="submit" class="btn btn-primary">开始导入</button>
+                <button class="btn btn-primary" type="submit">导入脚本</button>
             </div>
         </form>
     </div>
@@ -332,37 +516,19 @@
     <div class="offcanvas-header">
         <div>
             <h5 class="offcanvas-title mb-1" id="batchGenerateDrawerLabel">批量生成脚本</h5>
-            <div class="text-muted small">支持粘贴 JSON 数组，一次让 AI 生成多条脚本草稿。</div>
+            <div class="text-muted small">从结构化 JSON 批量生成可维护的 UI 自动化脚本。</div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭"></button>
     </div>
     <div class="offcanvas-body">
         <form method="post" action="{{ url_for('ui_auto.batch_generate_scripts') }}">
-            {% if current_project_id %}
-            <input type="hidden" name="project_id" value="{{ current_project_id }}">
-            {% else %}
             <div class="drawer-section">
-                <div class="drawer-section-title">选择项目</div>
-                <select class="form-select" name="project_id" required>
-                    <option value="">请选择项目</option>
-                    {% for project in global_projects %}
-                    <option value="{{ project.id }}">{{ project.name }}</option>
-                    {% endfor %}
-                </select>
+                <div class="drawer-section-title">生成配置 JSON</div>
+                <textarea class="form-control font-monospace" name="batch_jobs_json" rows="18" placeholder='[{"script_name":"登录校验","test_goal":"验证登录页可用"}]'></textarea>
             </div>
-            {% endif %}
-            <div class="drawer-section">
-                <div class="drawer-section-title">生成任务</div>
-                <textarea
-                    class="form-control json-textarea-lg"
-                    name="batch_jobs_json"
-                    rows="18"
-                    placeholder='[{"script_name":"登录冒烟脚本","script_code":"login_smoke_ai","test_goal":"登录后进入 Dashboard 并校验标题","page_url":"/dashboard","page_name":"Dashboard","need_login":true,"login_url":"/login","assert_text":"Dashboard","locator_codes":"login_button"}]'></textarea>
-                <div class="form-text mt-2">字段支持：script_name、script_code、test_goal、page_url、page_name、need_login、assert_text、locator_codes。</div>
-            </div>
-            <div class="d-flex justify-content-end gap-2 pt-2">
+            <div class="drawer-actions">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
-                <button type="submit" class="btn btn-primary">开始生成</button>
+                <button class="btn btn-primary" type="submit">生成脚本</button>
             </div>
         </form>
     </div>
@@ -450,12 +616,13 @@
                             <th>状态</th>
                             <th>环境</th>
                             <th>浏览器</th>
-                            <th>模式</th>
+                            <th>触发类型</th>
+                            <th>触发人员</th>
                             <th>时间</th>
                         </tr>
                     </thead>
                     <tbody id="detailRecentRunsBody">
-                        <tr><td colspan="6" class="text-muted">暂无记录</td></tr>
+                        <tr><td colspan="7" class="text-muted">暂无记录</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -565,7 +732,7 @@
             const runsBody = document.getElementById('detailRecentRunsBody');
             const runs = Array.isArray(detail.recent_runs) ? detail.recent_runs : [];
             if (!runs.length) {
-                runsBody.innerHTML = '<tr><td colspan="6" class="text-muted">暂无记录</td></tr>';
+                runsBody.innerHTML = '<tr><td colspan="7" class="text-muted">暂无记录</td></tr>';
                 return;
             }
             runsBody.innerHTML = runs.map(item => {
@@ -575,7 +742,8 @@
                     <td><span class="badge ${statusClass}">${item.status || '-'}</span></td>
                     <td>${item.environment_name || '-'}</td>
                     <td>${item.browser_type || '-'}</td>
-                    <td>${item.run_mode || '-'}</td>
+                    <td>${item.trigger_type === 'automatic' ? '自动触发' : '手动触发'}</td>
+                    <td>${item.trigger_person || '-'}</td>
                     <td>${item.created_at || '-'}</td>
                 </tr>`;
             }).join('');

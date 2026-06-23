@@ -81,11 +81,194 @@ def index(section="overview"):
         return redirect(url_for("ui_auto.executions_page"))
     if section == "replays":
         return redirect(url_for("ui_auto.replays_page"))
+
+    selected_project_id = resolve_project_id()
+    accessible_ids = accessible_project_ids()
+    if selected_project_id and selected_project_id in accessible_ids:
+        scripts = UiAutomationService.list_scripts(project_id=selected_project_id)
+        locators = UiAutomationService.list_locators(project_id=selected_project_id)
+        runs = UiAutomationService.list_runs(project_id=selected_project_id)
+    elif accessible_ids:
+        scripts = UiAutomationService.list_scripts(project_ids=accessible_ids)
+        locators = UiAutomationService.list_locators(project_ids=accessible_ids)
+        runs = UiAutomationService.list_runs(project_ids=accessible_ids)
+    else:
+        scripts = []
+        locators = []
+        runs = []
+
+    current_project = db.session.get(Project, selected_project_id) if selected_project_id else None
+    project_name = current_project.name if current_project else ("全部项目" if accessible_ids else "暂无项目")
+
+    script_active_count = sum(1 for script in scripts if script.status == "active")
+    locator_active_count = sum(1 for locator in locators if locator.status == "active")
+    locator_stable_count = sum(1 for locator in locators if locator.is_stable)
+    queue_count = sum(1 for run in runs if run.status in {"queued", "running"})
+    replay_count = 0
+    for run in runs:
+        artifacts = UiAutomationService.list_artifacts(run.id)
+        if any(artifact.artifact_type in {"report", "trace", "log"} for artifact in artifacts):
+            replay_count += 1
+
+    card_specs = [
+        {
+            "title": "脚本管理",
+            "count": len(scripts),
+            "note": f"{script_active_count} 个启用 · {max(len(scripts) - script_active_count, 0)} 个草稿",
+            "icon": "bi-file-earmark-code",
+            "theme": "blue",
+            "href": url_for("ui_auto.scripts_page"),
+        },
+        {
+            "title": "定位器库",
+            "count": len(locators),
+            "note": f"{locator_stable_count} 个稳定 · {locator_active_count} 个启用",
+            "icon": "bi-crosshair",
+            "theme": "green",
+            "href": url_for("ui_auto.locators_page"),
+        },
+        {
+            "title": "执行计划",
+            "count": len(runs),
+            "note": f"{queue_count} 条排队/执行中 · Worker 可直接处理",
+            "icon": "bi-calendar2-event",
+            "theme": "orange",
+            "href": url_for("ui_auto.executions_page"),
+        },
+        {
+            "title": "报告回放",
+            "count": replay_count,
+            "note": "Trace / 截图 / 日志一键回看",
+            "icon": "bi-play-btn",
+            "theme": "purple",
+            "href": url_for("ui_auto.replays_page"),
+        },
+    ]
+
+    recent_feed = []
+    for script in sorted(scripts, key=lambda item: item.updated_at or item.created_at, reverse=True)[:3]:
+        recent_feed.append(
+            {
+                "icon": "bi-file-earmark-code",
+                "theme": "blue",
+                "title": f"{script.name} 已更新",
+                "detail": script.description or script.code or "脚本配置已同步更新",
+                "time": (script.updated_at or script.created_at).strftime("%Y-%m-%d %H:%M:%S"),
+                "href": url_for("ui_auto.scripts_page", project_id=script.project_id),
+            }
+        )
+    for locator in sorted(locators, key=lambda item: item.updated_at or item.created_at, reverse=True)[:2]:
+        recent_feed.append(
+            {
+                "icon": "bi-crosshair",
+                "theme": "green",
+                "title": f"{locator.locator_name} 已更新",
+                "detail": locator.page_name or locator.description or locator.locator_code,
+                "time": (locator.updated_at or locator.created_at).strftime("%Y-%m-%d %H:%M:%S"),
+                "href": url_for("ui_auto.locators_page", project_id=locator.project_id),
+            }
+        )
+    for run in sorted(runs, key=lambda item: item.created_at or item.updated_at, reverse=True)[:3]:
+        artifacts = UiAutomationService.list_artifacts(run.id)
+        replay_href = (
+            url_for("ui_auto.replay_detail_page", run_id=run.id)
+            if any(artifact.artifact_type in {"report", "trace", "log"} for artifact in artifacts)
+            else url_for("ui_auto.executions_page", project_id=run.project_id)
+        )
+        recent_feed.append(
+            {
+                "icon": "bi-play-circle",
+                "theme": "purple",
+                "title": f"执行 {run.id} · {run.status}",
+                "detail": run.summary.get("environment_name", "") or run.summary.get("script_version", "执行计划已完成"),
+                "time": (run.created_at or run.updated_at).strftime("%Y-%m-%d %H:%M:%S"),
+                "href": replay_href,
+            }
+        )
+    recent_feed = sorted(recent_feed, key=lambda item: item["time"], reverse=True)[:6]
+
+    quick_entries = [
+        {
+            "icon": "bi-file-earmark-code",
+            "label": "脚本管理",
+            "href": url_for("ui_auto.scripts_page"),
+        },
+        {
+            "icon": "bi-crosshair",
+            "label": "定位器库",
+            "href": url_for("ui_auto.locators_page"),
+        },
+        {
+            "icon": "bi-calendar2-event",
+            "label": "执行计划",
+            "href": url_for("ui_auto.executions_page"),
+        },
+        {
+            "icon": "bi-play-btn",
+            "label": "报告回放",
+            "href": url_for("ui_auto.replays_page"),
+        },
+    ]
+
+    roadmap_steps = [
+        {
+            "step": "01",
+            "title": "脚本中心",
+            "desc": "先把脚本列表、版本管理、批量导入和 AI 生成能力打稳。",
+            "theme": "blue",
+        },
+        {
+            "step": "02",
+            "title": "定位器库",
+            "desc": "稳定页面定位，沉淀可复用的页面对象和上下文。",
+            "theme": "green",
+        },
+        {
+            "step": "03",
+            "title": "执行与回放",
+            "desc": "串起执行计划、Worker 和报告回放，把结果快速看懂。",
+            "theme": "orange",
+        },
+        {
+            "step": "04",
+            "title": "AI 辅助",
+            "desc": "补齐生成、修复与失败诊断，形成完整的闭环能力。",
+            "theme": "purple",
+        },
+    ]
+
+    ai_recommendations = [
+        {
+            "icon": "bi-magic",
+            "title": "根据页面生成脚本",
+            "desc": "先把常用页面流转为可维护脚本骨架。",
+            "href": url_for("ui_auto.index", section="scripts"),
+        },
+        {
+            "icon": "bi-crosshair",
+            "title": "定位器稳定性分析",
+            "desc": "找出高频变动定位器并优先收敛。",
+            "href": url_for("ui_auto.index", section="locators"),
+        },
+        {
+            "icon": "bi-bar-chart",
+            "title": "失败报告智能诊断",
+            "desc": "结合 Trace 与截图，快速判断失败原因。",
+            "href": url_for("ui_auto.replays_page"),
+        },
+    ]
+
     return render_template(
         "ui_automation/index.html",
         section=section,
         section_meta=_resolve_meta(section),
         sections=SECTION_META,
+        project_name=project_name,
+        card_specs=card_specs,
+        recent_feed=recent_feed,
+        quick_entries=quick_entries,
+        roadmap_steps=roadmap_steps,
+        ai_recommendations=ai_recommendations,
     )
 
 
@@ -140,6 +323,8 @@ def scripts_page():
                     "environment_name": _run_environment_name(run),
                     "browser_type": run.browser_type,
                     "run_mode": run.run_mode,
+                    "trigger_type": run.trigger_type,
+                    "trigger_person": run.trigger_person_name,
                     "duration_ms": run.duration_ms,
                     "created_at": run.created_at.strftime("%Y-%m-%d %H:%M:%S") if run.created_at else "-",
                 }
@@ -337,6 +522,7 @@ def ai_repair_script(script_id):
                 environment_id=source_run.environment_id,
                 browser_type=source_run.browser_type,
                 run_mode="ai_repair",
+                trigger_type="automatic",
                 max_retry=source_run.max_retry,
                 trigger_source="ui_ai_repair",
                 trigger_user_id=current_user.id if current_user else None,
@@ -897,6 +1083,7 @@ def executions_page():
         context = {"projects": [], "scripts": [], "environments": [], "runs": []}
 
     runs = context["runs"]
+    selected_project = db.session.get(Project, selected_project_id) if selected_project_id else None
     queue_stats = {
         "total": len(runs),
         "queued": sum(1 for run in runs if run.status == "queued"),
@@ -911,6 +1098,7 @@ def executions_page():
     return render_template(
         "ui_automation/executions.html",
         selected_project_id=selected_project_id,
+        selected_project=selected_project,
         projects=context["projects"],
         scripts=context["scripts"],
         environments=context["environments"],
@@ -930,9 +1118,10 @@ def create_execution():
             script_id=request.form.get("script_id"),
             environment_id=request.form.get("environment_id") or None,
             browser_type=request.form.get("browser_type", "chromium"),
-            run_mode=request.form.get("run_mode", "manual"),
+            run_mode="manual",
+            trigger_type="manual",
             max_retry=request.form.get("max_retry", 0),
-            trigger_source=request.form.get("trigger_source", "ui"),
+            trigger_source="ui",
             trigger_user_id=current_user.id if current_user else None,
         )
         flash(f"执行计划已提交，当前状态：{run.status}。", "success")
@@ -953,6 +1142,18 @@ def _get_accessible_run(run_id):
 def execute_run(run_id):
     try:
         run = _get_accessible_run(run_id)
+        current_user = get_current_user()
+        run.trigger_type = "manual"
+        run.trigger_user_id = current_user.id if current_user else None
+        summary = dict(run.summary or {})
+        summary["trigger_type"] = run.trigger_type
+        summary["trigger_person"] = (
+            current_user.display_name or current_user.username
+            if current_user
+            else "-"
+        )
+        run.summary = summary
+        db.session.commit()
         UiAutomationWorker.execute_run(run.id)
         if run.status == "passed":
             flash("UI 自动化脚本执行通过。", "success")
@@ -992,6 +1193,7 @@ def replays_page():
     browser_type = (request.args.get("browser_type") or "").strip().lower()
     selected_project_id = resolve_project_id()
     accessible_ids = accessible_project_ids()
+    selected_project = db.session.get(Project, selected_project_id) if selected_project_id else None
 
     if selected_project_id and selected_project_id in accessible_ids:
         runs = UiAutomationService.list_runs(project_id=selected_project_id)
@@ -1070,6 +1272,7 @@ def replays_page():
         selected_status=status,
         selected_browser_type=browser_type,
         selected_project_id=selected_project_id,
+        selected_project=selected_project,
         stats=stats,
         active_filters=active_filters,
     )

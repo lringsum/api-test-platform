@@ -1,0 +1,169 @@
+{% macro render_execution_rail(mode, execution=None, selected_project_id=None, selected_status=None, selected_execution_type=None, avg_duration=None, recent_total=None, status_label=None, show_report_link=False) %}
+{% if mode == 'detail' %}
+    {% set quick_link_label = '返回历史' %}
+{% else %}
+    {% set quick_link_label = '去执行' %}
+{% endif %}
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+        {% if mode == 'detail' %}
+        <a href="{{ url_for('execution.history_page') }}">{{ quick_link_label }}</a>
+        {% else %}
+        <a href="{{ url_for('execution.run_page') }}">{{ quick_link_label }}</a>
+        {% endif %}
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            {% if mode == 'detail' %}
+            <a class="module-quick-item" href="{{ url_for('execution.history_page', project_id=execution.project_id) }}">
+                <i class="bi bi-clock-history"></i>
+                <span>历史记录</span>
+            </a>
+            {% if show_report_link %}
+            <a class="module-quick-item" href="{{ url_for('report.detail_report', report_id=execution.report.id) if execution.report else url_for('execution.execution_report_page', execution_id=execution.id) }}">
+                <i class="bi bi-bar-chart-fill"></i>
+                <span>执行报告</span>
+            </a>
+            {% endif %}
+            <a class="module-quick-item" href="{{ url_for('testcase.detail_testcase_page', testcase_id=execution.details[0].testcase_id) if execution.details and execution.details[0].testcase_id else url_for('testcase.list_testcases') }}">
+                <i class="bi bi-card-checklist"></i>
+                <span>关联用例</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('execution.run_page') }}">
+                <i class="bi bi-play-circle"></i>
+                <span>继续执行</span>
+            </a>
+            {% else %}
+            <a class="module-quick-item" href="{{ url_for('execution.run_page') }}">
+                <i class="bi bi-play-circle"></i>
+                <span>立即执行</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('report.list_reports') }}">
+                <i class="bi bi-bar-chart-fill"></i>
+                <span>报告列表</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('testcase.list_testcases') }}">
+                <i class="bi bi-card-checklist"></i>
+                <span>用例管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('scenario.list_scenarios') }}">
+                <i class="bi bi-bezier2"></i>
+                <span>场景管理</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 洞察</strong>
+        <span class="module-side-badge">{% if mode == 'detail' %}执行分析{% else %}历史分析{% endif %}</span>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            {% if mode == 'detail' %}
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-0"><i class="bi bi-activity"></i></span>
+                <div>
+                    <strong>先看失败步骤</strong>
+                    <small>优先展开失败项，通常最能快速定位问题点</small>
+                </div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-1"><i class="bi bi-receipt"></i></span>
+                <div>
+                    <strong>对照请求和响应快照</strong>
+                    <small>重点检查状态码、返回体和断言是否一致</small>
+                </div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-2"><i class="bi bi-arrow-repeat"></i></span>
+                <div>
+                    <strong>结合报告做二次分析</strong>
+                    <small>如果需要复盘，先打开报告再回到步骤详情</small>
+                </div>
+            </div>
+            {% else %}
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-0"><i class="bi bi-search"></i></span>
+                <div>
+                    <strong>优先关注失败与运行中批次</strong>
+                    <small>它们最值得回看执行详情和报告</small>
+                </div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-1"><i class="bi bi-bar-chart"></i></span>
+                <div>
+                    <strong>结合通过率看稳定性</strong>
+                    <small>如果同类执行反复波动，优先检查共享环境</small>
+                </div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-2"><i class="bi bi-clock-history"></i></span>
+                <div>
+                    <strong>用最近 7 日记录看活跃度</strong>
+                    <small>判断当前项目是否持续有回归动作</small>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>当前状态</strong>
+        <span class="module-side-badge">实时</span>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="testcase-state-list">
+            {% if mode == 'detail' %}
+            <div class="testcase-state-item">
+                <span>项目</span>
+                <strong>{{ execution.project.name }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>环境</span>
+                <strong>{{ execution.environment.name if execution.environment else '-' }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>状态</span>
+                <strong>{{ status_label }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>通过率</span>
+                <strong>{{ execution.pass_rate }}%</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>步骤数</span>
+                <strong>{{ execution.total_count }}</strong>
+            </div>
+            {% else %}
+            <div class="testcase-state-item">
+                <span>项目</span>
+                <strong>{{ selected_project_id if selected_project_id else '全部项目' }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>状态</span>
+                <strong>{{ selected_status if selected_status else '全部状态' }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>类型</span>
+                <strong>{{ selected_execution_type if selected_execution_type else '全部类型' }}</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>平均耗时</span>
+                <strong>{{ avg_duration }} ms</strong>
+            </div>
+            <div class="testcase-state-item">
+                <span>近 7 日</span>
+                <strong>{{ recent_total }}</strong>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endmacro %}

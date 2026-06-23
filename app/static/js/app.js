@@ -1,31 +1,11 @@
-function prettyJson(value) {
-    try {
-        if (typeof value === "string") {
-            value = JSON.parse(value);
-        }
-        return JSON.stringify(value, null, 2);
-    } catch (e) {
-        return typeof value === "string" ? value : String(value);
-    }
-}
+/*
+DEPRECATED FILE - DO NOT EDIT.
 
-function showResultText(elementId, value) {
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    el.textContent = typeof value === "string" ? value : prettyJson(value);
-}
+Runtime pages do not load app/static/js/app.js.
+Flask is configured to serve static assets from:
 
-async function postJson(url, payload) {
-    const response = await fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload || {})
-    });
-    const data = await response.json();
-    if (!response.ok || !data.success) {
-        throw new Error(data.message || "请求失败");
-    }
-    return data;
-}
+    public/js/app.js
+
+If a UI behavior change does not appear in the browser, edit the public copy above.
+This placeholder remains only to prevent future confusion with the old duplicate path.
+*/

@@ -1,143 +1,332 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
+{% from "shared/execution_rail.html" import render_execution_rail %}
+{% from "shared/execution_actions.html" import render_execution_actions %}
 
 {% block title %}执行详情{% endblock %}
 {% block page_title %}执行详情 #{{ execution.id }}{% endblock %}
-{% block page_desc %}查看请求快照、响应内容、断言结果和错误信息{% endblock %}
+{% block page_desc %}查看请求快照、响应内容、断言结果和错误信息，统一延续 workbench 视觉体系{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
-{% block content %}
-<div class="row g-3 mb-4">
-    <div class="col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted">执行状态</div><div class="fs-4">{% if execution.status == 'passed' %}<span class="text-success">成功</span>{% elif execution.status == 'failed' %}<span class="text-danger">失败</span>{% else %}<span class="text-secondary">{{ execution.status }}</span>{% endif %}</div></div></div></div>
-    <div class="col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted">总用例数</div><div class="fs-4">{{ execution.total_count }}</div></div></div></div>
-    <div class="col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted">通过率</div><div class="fs-4">{{ execution.pass_rate }}%</div></div></div></div>
-    <div class="col-md-3"><div class="card h-100"><div class="card-body"><div class="text-muted">总耗时</div><div class="fs-4">{{ execution.total_duration_ms }} ms</div></div></div></div>
-</div>
+{% set workspace_page_class = 'execution-detail-page' %}
+{% set workspace_layout_class = 'execution-detail-layout' %}
 
-<div class="card mb-4">
-    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <div>
-            <div class="text-muted small">报告回放</div>
-            <div class="fw-semibold">执行结果可直接生成或打开报告详情，方便继续排查失败用例。</div>
+{% if execution.status == 'passed' %}
+    {% set status_label = '成功' %}
+    {% set status_class = 'status-active' %}
+    {% set status_icon = 'bi-check2-circle' %}
+{% elif execution.status == 'partial_success' %}
+    {% set status_label = '部分成功' %}
+    {% set status_class = 'status-pending' %}
+    {% set status_icon = 'bi-exclamation-triangle' %}
+{% elif execution.status == 'failed' %}
+    {% set status_label = '失败' %}
+    {% set status_class = 'status-muted' %}
+    {% set status_icon = 'bi-x-circle' %}
+{% else %}
+    {% set status_label = execution.status %}
+    {% set status_class = 'status-muted' %}
+    {% set status_icon = 'bi-dot' %}
+{% endif %}
+
+{% set target_label %}
+    {% if execution.target_type == 'selection' %}
+        selection / {{ execution.summary.get('selected_count', execution.total_count) }} 条
+    {% else %}
+        {{ execution.target_type }} / {{ execution.target_id }}
+    {% endif %}
+{% endset %}
+{% set runtime_label = (execution.started_at or execution.created_at) | bjt %}
+{% set runtime_date = runtime_label.split(' ')[0] if ' ' in runtime_label else runtime_label %}
+{% set runtime_time = runtime_label.split(' ')[1] if ' ' in runtime_label else '' %}
+{% set finished_label = execution.finished_at | bjt if execution.finished_at else '-' %}
+
+{% block workspace_heading %}执行详情{% endblock %}
+{% block workspace_subtitle %}查看请求快照、响应内容、断言结果和错误信息，统一延续 workbench 视觉体系{% endblock %}
+
+{% block workspace_back %}
+<a class="btn btn-outline-secondary module-secondary-btn workspace-back-btn" href="{{ url_for('execution.history_page') }}">
+    <i class="bi bi-arrow-left"></i>
+    返回历史
+</a>
+{% endblock %}
+
+{% block workspace_actions %}
+{{ render_execution_actions(
+    'detail',
+    execution=execution,
+    report_exists=execution.report is not none
+) }}
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi {{ status_icon }}"></i></span>
+        <div class="module-metric-copy">
+            <small>执行状态</small>
+            <strong>{{ status_label }}</strong>
+            <span>{{ execution.execution_type }} · {{ target_label }}</span>
         </div>
-        <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-outline-secondary" href="{{ url_for('execution.history_page', project_id=execution.project_id) }}">返回历史</a>
-            {% if has_permission('report:view') %}
-                {% if execution.report %}
-                <a class="btn btn-success" href="{{ url_for('report.detail_report', report_id=execution.report.id) }}"><i class="bi bi-bar-chart-fill me-1"></i>打开报告</a>
-                {% else %}
-                <a class="btn btn-primary" href="{{ url_for('execution.execution_report_page', execution_id=execution.id) }}"><i class="bi bi-arrow-repeat me-1"></i>生成报告</a>
-                {% endif %}
-            {% endif %}
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-list-check"></i></span>
+        <div class="module-metric-copy">
+            <small>总步骤数</small>
+            <strong>{{ execution.total_count }}</strong>
+            <span>本次执行覆盖的步骤</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-graph-up-arrow"></i></span>
+        <div class="module-metric-copy">
+            <small>通过率</small>
+            <strong>{{ execution.pass_rate }}%</strong>
+            <span>{{ execution.passed_count }} / {{ execution.total_count }} 步骤通过</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-stopwatch"></i></span>
+        <div class="module-metric-copy">
+            <small>总耗时</small>
+            <strong>{{ execution.total_duration_ms }} ms</strong>
+            <span>{{ runtime_date }} · {{ runtime_time }}</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 回放辅助</span>
+            <small>执行分析</small>
+        </div>
+        <p>把每一步的请求、响应、断言和提取结果放在同一视图里，便于快速定位失败位置和修复范围。</p>
+    </div>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('execution.execution_report_page', execution_id=execution.id) }}">
+        生成报告
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card execution-detail-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>执行概览</strong>
+            <small>{{ execution.project.name }} · {{ execution.environment.name if execution.environment else '无环境' }}</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-chip module-count-chip">{{ status_label }}</span>
+            <span class="module-chip module-count-chip">{{ execution.execution_type }}</span>
         </div>
     </div>
-</div>
-
-<div class="card mb-4">
-    <div class="card-header bg-white"><strong>执行基本信息</strong></div>
     <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-3"><strong>项目：</strong>{{ execution.project.name }}</div>
-            <div class="col-md-3"><strong>环境：</strong>{{ execution.environment.name if execution.environment else '-' }}</div>
-            <div class="col-md-3"><strong>类型：</strong>{{ execution.execution_type }}</div>
-            <div class="col-md-3">
-                <strong>目标：</strong>
-                {% if execution.target_type == 'selection' %}
-                selection / {{ execution.summary.get('selected_count', execution.total_count) }} 条
-                {% else %}
-                {{ execution.target_type }} / {{ execution.target_id }}
-                {% endif %}
+        <div class="execution-overview-grid">
+            <div class="module-field">
+                <label class="form-label">项目</label>
+                <div class="execution-overview-value">{{ execution.project.name }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">环境</label>
+                <div class="execution-overview-value">{{ execution.environment.name if execution.environment else '-' }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">执行类型</label>
+                <div class="execution-overview-value">{{ execution.execution_type }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">目标</label>
+                <div class="execution-overview-value">{{ target_label }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">开始时间</label>
+                <div class="execution-overview-value">{{ runtime_label }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">结束时间</label>
+                <div class="execution-overview-value">{{ finished_label }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">通过 / 失败</label>
+                <div class="execution-overview-value">{{ execution.passed_count }} / {{ execution.failed_count }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">总步骤</label>
+                <div class="execution-overview-value">{{ execution.total_count }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">触发类型</label>
+                <div class="execution-overview-value">{{ execution.trigger_type_label }}</div>
+            </div>
+            <div class="module-field">
+                <label class="form-label">触发人员</label>
+                <div class="execution-overview-value">{{ execution.trigger_person_name }}</div>
             </div>
         </div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header bg-white"><strong>执行明细</strong></div>
-    <div class="card-body">
-        {% if execution.details %}
-        {% for detail in execution.details %}
-        <div class="card mb-2 detail-item">
-            <button class="card-header detail-toggle d-flex justify-content-between align-items-center w-100 border-0 bg-white"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#detailCollapse{{ detail.id }}"
-                    aria-expanded="false"
-                    aria-controls="detailCollapse{{ detail.id }}">
-                <span class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="fw-semibold">{{ (detail.testcase.name if detail.testcase else detail.testcase_name)|clean_text('未命名用例') }}</span>
-                    <span class="badge text-bg-light border text-muted">项目：{{ execution.project.name|clean_text('未知项目') }}</span>
-                    <span class="badge text-bg-light border text-muted">模块：{{ detail.testcase.module.name|clean_text('未知模块') if detail.testcase and detail.testcase.module else '未知模块' }}</span>
-                    {% set req = detail.request_data %}
-                    {% set req_method = (req.get('method', '') if req else '') %}
-                    {% set req_path = (req.get('path') or req.get('url') or '-') if req else '-' %}
-                    <span class="badge text-bg-light border text-muted">接口：{{ (req_method ~ ' ' ~ req_path).strip() }}</span>
-                </span>
-                <span class="d-flex align-items-center gap-3">
-                    <span class="text-muted">耗时：{{ detail.duration_ms }} ms</span>
-                    {% if detail.status == 'passed' %}
-                    <span class="badge bg-success">通过</span>
-                    {% elif detail.status == 'failed' %}
-                    <span class="badge bg-danger">失败</span>
-                    {% else %}
-                    <span class="badge bg-secondary">{{ detail.status }}</span>
-                    {% endif %}
-                </span>
-            </button>
-            <div id="detailCollapse{{ detail.id }}" class="collapse">
-                <div class="card-body">
-                    <div class="row g-3 mb-3">
-                        <div class="col-12"><strong>错误信息：</strong>{{ detail.error_message|clean_text('-') if detail.error_message else '-' }}</div>
-                    </div>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label mb-0">请求快照</label>
-                                {% if has_permission('execution:detail_full') %}
-                                <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="request">加载完整</button>
-                                {% endif %}
-                            </div>
-                            <div class="result-box detail-result-box" id="detailRequest{{ detail.id }}" style="min-height: 200px; height: 300px;">展开后按需加载请求快照...</div>
-                            <div class="form-text text-muted" id="detailRequestMeta{{ detail.id }}"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label mb-0">响应快照</label>
-                                {% if has_permission('execution:detail_full') %}
-                                <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="response">加载完整</button>
-                                {% endif %}
-                            </div>
-                            <div class="result-box detail-result-box" id="detailResponse{{ detail.id }}" style="min-height: 200px; height: 300px;">展开后按需加载响应快照...</div>
-                            <div class="form-text text-muted" id="detailResponseMeta{{ detail.id }}"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label mb-0">断言结果</label>
-                                {% if has_permission('execution:detail_full') %}
-                                <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="assertion">加载完整</button>
-                                {% endif %}
-                            </div>
-                            <div class="result-box detail-result-box" id="detailAssertion{{ detail.id }}" style="min-height: 150px; height: 150px;">展开后按需加载断言结果...</div>
-                            <div class="form-text text-muted" id="detailAssertionMeta{{ detail.id }}"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label mb-0">提取变量</label>
-                                {% if has_permission('execution:detail_full') %}
-                                <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="extract">加载完整</button>
-                                {% endif %}
-                            </div>
-                            <div class="result-box detail-result-box" id="detailExtract{{ detail.id }}" style="min-height: 150px; height: 150px;">展开后按需加载提取变量...</div>
-                            <div class="form-text text-muted" id="detailExtractMeta{{ detail.id }}"></div>
-                        </div>
+        <div class="execution-overview-summary">
+            <div class="execution-overview-summary-head">
+                <div>
+                    <label class="form-label mb-1">执行摘要</label>
+                    <div class="execution-overview-summary-meta">
+                        <span class="module-chip module-count-chip">ID #{{ execution.id }}</span>
+                        <span class="module-chip module-count-chip">{{ execution.trigger_type_label }}</span>
+                        <span class="module-chip module-count-chip">{{ execution.trigger_person_name }}</span>
+                        <span class="module-chip module-count-chip">{{ status_label }}</span>
                     </div>
                 </div>
             </div>
+            <div class="testcase-detail-description execution-overview-note">
+                {{ execution.summary.get('selected_count', execution.total_count) if execution.target_type == 'selection' else execution.target_id }} 个目标已纳入本次执行，当前结果可直接和右侧历史/报告入口串联回看。
+            </div>
+            <details class="execution-summary-details">
+                <summary>查看运行快照</summary>
+                <pre class="scenario-code-box testcase-detail-code">{{ execution.summary | tojson(indent=2) }}</pre>
+            </details>
         </div>
-        {% endfor %}
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_list %}
+<section class="card execution-detail-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>执行步骤</strong>
+            <small>按执行顺序展开每一步的请求与回放内容</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-chip module-count-chip">共 {{ execution.details | length }} 步</span>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if execution.details %}
+        <div class="scenario-step-list execution-step-list">
+            {% for detail in execution.details %}
+            {% set req = detail.request_data %}
+            {% set req_method = (req.get('method', '') if req else '') %}
+            {% set req_path = (req.get('path') or req.get('url') or '-') if req else '-' %}
+            <article class="scenario-step-card card">
+                <button class="scenario-step-header" type="button" data-bs-toggle="collapse" data-bs-target="#executionDetailCollapse{{ detail.id }}" aria-expanded="{{ 'true' if loop.first else 'false' }}" aria-controls="executionDetailCollapse{{ detail.id }}">
+                    <div class="scenario-step-headline">
+                        <strong>{{ (detail.testcase.name if detail.testcase else detail.testcase_name)|clean_text('未命名用例') }}</strong>
+                        <small>{{ (req_method ~ ' ' ~ req_path).strip() }}</small>
+                    </div>
+                    <div class="scenario-step-meta">
+                        <span class="module-chip module-count-chip">#{{ loop.index }}</span>
+                        <span class="module-chip module-count-chip">{{ detail.duration_ms }} ms</span>
+                        {% if detail.status == 'passed' %}
+                        <span class="module-status-chip status-active"><i class="bi bi-dot"></i>通过</span>
+                        {% elif detail.status == 'failed' %}
+                        <span class="module-status-chip status-muted"><i class="bi bi-dot"></i>失败</span>
+                        {% else %}
+                        <span class="module-status-chip status-pending"><i class="bi bi-dot"></i>{{ detail.status }}</span>
+                        {% endif %}
+                    </div>
+                </button>
+                <div id="executionDetailCollapse{{ detail.id }}" class="collapse {% if loop.first %}show{% endif %}">
+                    <div class="card-body execution-step-body">
+                        <div class="scenario-detail-grid execution-detail-grid">
+                            <div class="scenario-detail-meta">
+                                <div><span>用例</span><strong>{{ (detail.testcase.name if detail.testcase else detail.testcase_name)|clean_text('未命名用例') }}</strong></div>
+                                <div><span>项目</span><strong>{{ execution.project.name|clean_text('未知项目') }}</strong></div>
+                                <div><span>模块</span><strong>{{ detail.testcase.module.name|clean_text('未知模块') if detail.testcase and detail.testcase.module else '未知模块' }}</strong></div>
+                                <div><span>接口</span><strong>{{ (req_method ~ ' ' ~ req_path).strip() }}</strong></div>
+                                <div><span>耗时</span><strong>{{ detail.duration_ms }} ms</strong></div>
+                                <div><span>状态</span><strong class="scenario-detail-status {% if detail.status == 'passed' %}status-active{% elif detail.status == 'failed' %}status-muted{% else %}status-pending{% endif %}">{{ detail.status }}</strong></div>
+                            </div>
+                            <div class="scenario-detail-notes">
+                                <label class="form-label">错误信息</label>
+                                <div class="testcase-detail-description">{{ detail.error_message|clean_text('-') if detail.error_message else '-' }}</div>
+                                <label class="form-label mt-3">执行摘要</label>
+                                <pre class="scenario-code-box testcase-detail-code">{{ {
+                                    "request": detail.request_data,
+                                    "response": detail.response_data,
+                                    "assertion": detail.assertion_data,
+                                    "extract": detail.extract_data
+                                } | tojson(indent=2) }}</pre>
+                            </div>
+                        </div>
+
+                        <div class="execution-detail-panels">
+                            <div class="execution-detail-panel">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label mb-0">请求快照</label>
+                                    {% if has_permission('execution:detail_full') %}
+                                    <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="request">加载完整</button>
+                                    {% endif %}
+                                </div>
+                                <div class="result-box detail-result-box execution-result-box" id="detailRequest{{ detail.id }}">展开后按需加载请求快照...</div>
+                                <div class="form-text text-muted" id="detailRequestMeta{{ detail.id }}"></div>
+                            </div>
+                            <div class="execution-detail-panel">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label mb-0">响应快照</label>
+                                    {% if has_permission('execution:detail_full') %}
+                                    <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="response">加载完整</button>
+                                    {% endif %}
+                                </div>
+                                <div class="result-box detail-result-box execution-result-box" id="detailResponse{{ detail.id }}">展开后按需加载响应快照...</div>
+                                <div class="form-text text-muted" id="detailResponseMeta{{ detail.id }}"></div>
+                            </div>
+                            <div class="execution-detail-panel">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label mb-0">断言结果</label>
+                                    {% if has_permission('execution:detail_full') %}
+                                    <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="assertion">加载完整</button>
+                                    {% endif %}
+                                </div>
+                                <div class="result-box detail-result-box execution-result-box" id="detailAssertion{{ detail.id }}">展开后按需加载断言结果...</div>
+                                <div class="form-text text-muted" id="detailAssertionMeta{{ detail.id }}"></div>
+                            </div>
+                            <div class="execution-detail-panel">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label mb-0">提取变量</label>
+                                    {% if has_permission('execution:detail_full') %}
+                                    <button class="btn btn-sm btn-outline-secondary detail-full-btn" type="button" data-detail-id="{{ detail.id }}" data-section="extract">加载完整</button>
+                                    {% endif %}
+                                </div>
+                                <div class="result-box detail-result-box execution-result-box" id="detailExtract{{ detail.id }}">展开后按需加载提取变量...</div>
+                                <div class="form-text text-muted" id="detailExtractMeta{{ detail.id }}"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
         {% else %}
-        <div class="empty-box">当前执行记录暂无明细</div>
+        <div class="module-empty-state">
+            <span><i class="bi bi-clock-history"></i></span>
+            <strong>当前执行暂无步骤明细</strong>
+            <p>执行完成后，这里会展示每一步的请求、响应、断言和提取结果。</p>
+        </div>
         {% endif %}
     </div>
-</div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+{{ render_execution_rail(
+    'detail',
+    execution=execution,
+    status_label=status_label,
+    show_report_link=has_permission('report:view')
+) }}
 {% endblock %}
 
 {% block scripts %}
@@ -154,12 +343,13 @@ function getDetailSectionElements(detailId, section) {
         button: document.querySelector(`.detail-full-btn[data-detail-id="${detailId}"][data-section="${section}"]`)
     };
 }
+
 function renderDetailSection(detailId, section, payload) {
     const elements = getDetailSectionElements(detailId, section);
     if (!elements.box || !elements.meta) return;
     elements.box.textContent = payload.text || "(空)";
     let metaText = `${DETAIL_SECTION_LABELS[section]}长度：${payload.length} 字符`;
-    if (payload.truncated) metaText += "，当前仅展示预览";
+    if (payload.truncated) metaText += "，当前仅显示预览";
     else if (payload.full) metaText += "，已加载完整内容";
     else metaText += "，已完整展示";
     elements.meta.textContent = metaText;
@@ -168,6 +358,7 @@ function renderDetailSection(detailId, section, payload) {
         elements.button.textContent = payload.full ? "已加载完整" : "加载完整";
     }
 }
+
 async function loadDetailPayload(detailId, section = "", full = false) {
     const cacheKey = `${detailId}:${section || "all"}:${full ? "full" : "preview"}`;
     const cache = full ? detailFullCache : detailPreviewCache;
@@ -181,13 +372,15 @@ async function loadDetailPayload(detailId, section = "", full = false) {
     cache.set(cacheKey, result.data);
     return result.data;
 }
+
 async function loadDetailPreview(detailId) {
-    const collapse = document.getElementById(`detailCollapse${detailId}`);
+    const collapse = document.getElementById(`executionDetailCollapse${detailId}`);
     if (collapse && collapse.dataset.loaded === "1") return;
     const data = await loadDetailPayload(detailId);
     Object.entries(data.sections || {}).forEach(([section, payload]) => renderDetailSection(detailId, section, payload));
     if (collapse) collapse.dataset.loaded = "1";
 }
+
 async function loadDetailFull(detailId, section) {
     const elements = getDetailSectionElements(detailId, section);
     if (!elements.box) return;
@@ -196,9 +389,10 @@ async function loadDetailFull(detailId, section) {
     const payload = (data.sections || {})[section];
     if (payload) renderDetailSection(detailId, section, payload);
 }
-document.querySelectorAll(".collapse[id^='detailCollapse']").forEach((collapseEl) => {
+
+document.querySelectorAll(".collapse[id^='executionDetailCollapse']").forEach((collapseEl) => {
     collapseEl.addEventListener("show.bs.collapse", async function () {
-        const detailId = this.id.replace("detailCollapse", "");
+        const detailId = this.id.replace("executionDetailCollapse", "");
         try {
             await loadDetailPreview(detailId);
         } catch (error) {
@@ -209,6 +403,7 @@ document.querySelectorAll(".collapse[id^='detailCollapse']").forEach((collapseEl
         }
     });
 });
+
 {% if has_permission('execution:detail_full') %}
 document.querySelectorAll(".detail-full-btn").forEach((button) => {
     button.addEventListener("click", async function () {

@@ -1,8 +1,10 @@
 from app.utils.extractor import get_value_by_path
+from app.utils.variable_resolver import resolve_variables
 
 
-def run_assertions(assertions, response_snapshot, duration_ms):
+def run_assertions(assertions, response_snapshot, duration_ms, runtime_variables=None):
     results = []
+    assertions = resolve_variables(assertions or [], runtime_variables or {})
 
     for item in assertions:
         assert_type = item.get("type")
@@ -32,6 +34,26 @@ def run_assertions(assertions, response_snapshot, duration_ms):
             passed = str(expected) in str(actual)
             if not passed:
                 message = f"响应内容不包含期望文本：{expected}"
+
+        elif assert_type == "json_array_contains":
+            response_json = response_snapshot.get("json")
+            path = item.get("path")
+            item_path = item.get("item_path")
+            actual = get_value_by_path(response_json, path, default=None)
+            if isinstance(actual, list):
+                if item_path:
+                    passed = any(
+                        get_value_by_path(value, item_path, default=None) == expected
+                        for value in actual
+                    )
+                else:
+                    passed = expected in actual
+            if response_json is None:
+                message = "响应不是合法 JSON，无法执行 json_array_contains 断言"
+            elif not isinstance(actual, list):
+                message = f"路径 {path} 的实际值不是数组"
+            elif not passed:
+                message = f"路径 {path} 的数组中不包含期望值 {expected}"
 
         elif assert_type == "response_time":
             actual = duration_ms

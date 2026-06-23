@@ -1,268 +1,409 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}项目管理{% endblock %}
 {% block page_title %}项目管理{% endblock %}
-{% block page_desc %}维护测试项目基础信息与协作配置{% endblock %}
+{% block page_desc %}按项目维度统一维护测试资源与协作配置{% endblock %}
 {% block topbar_class %}topbar-without-page{% endblock %}
 {% block topbar_page %}{% endblock %}
 
-{% block content %}
+{% set workspace_page_class = 'project-workspace-page' %}
+{% set workspace_layout_class = 'project-layout' %}
+{% set workspace_rail_class = 'project-rail' %}
 {% set active_projects = projects | selectattr('status', 'equalto', 'active') | list %}
 {% set inactive_projects = projects | rejectattr('status', 'equalto', 'active') | list %}
-{% set project_stats = namespace(modules=0, environments=0) %}
+{% set project_stats = namespace(modules=0, environments=0, recent=0) %}
 {% for item in projects %}
     {% set project_stats.modules = project_stats.modules + (item.modules | length) %}
     {% set project_stats.environments = project_stats.environments + (item.environments | length) %}
+    {% if item.updated_at and item.updated_at >= recent_cutoff %}
+        {% set project_stats.recent = project_stats.recent + 1 %}
+    {% endif %}
 {% endfor %}
 
-<div class="project-page">
-    <div class="project-toolbar">
-        <div>
-            <span class="page-eyebrow">PROJECT WORKSPACE</span>
-            <h2>项目工作台</h2>
-            <p>集中查看项目状态、测试资源和最近配置，让日常维护更轻松。</p>
-        </div>
-    </div>
+{% block workspace_heading %}项目管理{% endblock %}
+{% block workspace_subtitle %}按项目维度统一维护测试资源与协作配置{% endblock %}
 
-    <button class="project-side-toggle" id="projectSideToggle" type="button" aria-expanded="false" aria-controls="projectSidePanel" title="展开快捷侧栏">
-        <i class="bi bi-layout-sidebar-inset-reverse"></i>
-        <span>快捷侧栏</span>
+{% block workspace_actions %}
+    {% if has_permission('project:create') %}
+    <button class="btn btn-primary module-primary-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#createProjectDrawer">
+        <i class="bi bi-plus-lg"></i>
+        新建项目
     </button>
+    {% endif %}
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('ai.parser_page') if has_permission('ai:use') else 'javascript:void(0)' }}">
+        <i class="bi bi-stars"></i>
+        AI 解析
+    </a>
+{% endblock %}
 
-    <div class="project-layout" id="projectLayout">
-        <div class="project-main-column">
-            <section class="project-stat-grid">
-                <article class="project-stat-card stat-blue">
-                    <span class="project-stat-icon"><i class="bi bi-box"></i></span>
-                    <div><small>项目总数</small><strong>{{ projects | length }}</strong><span>当前可访问项目</span></div>
-                </article>
-                <article class="project-stat-card stat-green">
-                    <span class="project-stat-icon"><i class="bi bi-check-circle"></i></span>
-                    <div><small>启用中</small><strong>{{ active_projects | length }}</strong><span>占比 {{ ((active_projects | length) * 100 / (projects | length)) | round | int if projects else 0 }}%</span></div>
-                </article>
-                <article class="project-stat-card stat-orange">
-                    <span class="project-stat-icon"><i class="bi bi-wrench-adjustable"></i></span>
-                    <div><small>停用项目</small><strong>{{ inactive_projects | length }}</strong><span>需要关注与维护</span></div>
-                </article>
-                <article class="project-stat-card stat-purple">
-                    <span class="project-stat-icon"><i class="bi bi-diagram-3"></i></span>
-                    <div><small>模块 / 环境</small><strong>{{ project_stats.modules }} / {{ project_stats.environments }}</strong><span>当前筛选资源量</span></div>
-                </article>
-            </section>
-
-            <section class="project-ai-banner">
-                <div class="project-ai-copy">
-                    <span><i class="bi bi-stars"></i>AI 智能辅助 <em>效率升级</em></span>
-                    <p>快速解析接口文档、生成用例与项目结构建议，减少重复配置。</p>
-                </div>
-                <div class="project-ai-visual"><i class="bi bi-robot"></i></div>
-                {% if has_permission('ai:use') %}
-                <a class="btn btn-primary" href="{{ url_for('ai.parser_page') }}">立即体验<i class="bi bi-arrow-right"></i></a>
-                {% endif %}
-            </section>
-
-            <section class="project-filter-card">
-                <form method="get" action="{{ url_for('project.list_projects') }}" class="project-filter-form">
-                    <div class="filter-field filter-grow">
-                        <label for="projectKeyword">关键词</label>
-                        <div class="filter-input">
-                            <i class="bi bi-search"></i>
-                            <input id="projectKeyword" type="text" name="keyword" value="{{ keyword or '' }}" placeholder="搜索项目名称">
-                        </div>
-                    </div>
-                    <div class="filter-field">
-                        <label for="projectStatus">状态</label>
-                        <select id="projectStatus" class="form-select" name="status">
-                            <option value="">全部状态</option>
-                            <option value="active" {% if selected_status == 'active' %}selected{% endif %}>启用</option>
-                            <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>停用</option>
-                        </select>
-                    </div>
-                    <div class="project-filter-actions">
-                        <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i>查询</button>
-                        <a class="btn btn-outline-secondary" href="{{ url_for('project.list_projects') }}">重置</a>
-                    </div>
-                </form>
-            </section>
-
-            <section class="project-list-card">
-                <header>
-                    <div>
-                        <h3>项目列表</h3>
-                        <p>共 {{ projects | length }} 个项目</p>
-                    </div>
-                    <div class="project-list-tools">
-                        <button class="btn btn-sm btn-outline-secondary" type="button"><i class="bi bi-upload"></i>批量导入</button>
-                        <button class="btn btn-sm btn-outline-secondary" type="button"><i class="bi bi-download"></i>导出</button>
-                    </div>
-                </header>
-                {% if projects %}
-                <div class="table-responsive">
-                    <table class="table project-table">
-                        <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>项目名称</th>
-                            <th>描述</th>
-                            <th>状态</th>
-                            <th>资源</th>
-                            <th>更新时间</th>
-                            <th class="text-end">操作</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for item in projects %}
-                        <tr>
-                            <td class="project-id">{{ item.id }}</td>
-                            <td>
-                                <div class="project-name-cell">
-                                    <span class="project-row-icon icon-{{ loop.index0 % 4 }}"><i class="bi bi-folder2"></i></span>
-                                    <div><strong>{{ item.name }}</strong><small>PROJECT-{{ '%03d' | format(item.id) }}</small></div>
-                                </div>
-                            </td>
-                            <td class="project-description">{{ item.description or '暂无项目描述' }}</td>
-                            <td>
-                                {% if item.status == 'active' %}
-                                <span class="project-status status-active"><i></i>启用</span>
-                                {% else %}
-                                <span class="project-status status-inactive"><i></i>停用</span>
-                                {% endif %}
-                            </td>
-                            <td><span class="project-resource">{{ item.modules | length }} 模块</span><span class="project-resource">{{ item.environments | length }} 环境</span></td>
-                            <td class="project-time">{{ (item.updated_at or item.created_at) | bjt }}</td>
-                            <td>
-                                <div class="project-row-actions">
-                                    {% if has_permission('project:edit') %}
-                                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#editProjectDrawer{{ item.id }}">编辑</button>
-                                    {% endif %}
-                                    {% if has_permission('project:delete') %}
-                                    <form method="post" action="{{ url_for('project.delete_project', project_id=item.id) }}" onsubmit="return confirm('确认删除该项目及其所有关联数据吗？');">
-                                        <button class="btn btn-sm btn-outline-danger" type="submit">删除</button>
-                                    </form>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="project-empty">
-                    <span><i class="bi bi-folder-plus"></i></span>
-                    <strong>暂时没有匹配的项目</strong>
-                    <p>调整筛选条件，或新建一个项目开始测试。</p>
-                </div>
-                {% endif %}
-            </section>
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-folder2"></i></span>
+        <div class="module-metric-copy">
+            <small>项目总数</small>
+            <strong>{{ projects | length }}</strong>
+            <span>当前可访问项目范围统计</span>
         </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-check2-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>启用中</small>
+            <strong>{{ active_projects | length }}</strong>
+            <span>占比 {{ ((active_projects | length) * 100 / (projects | length)) | round | int if projects else 0 }}%</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-slash-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>已停用</small>
+            <strong>{{ inactive_projects | length }}</strong>
+            <span>需要重点关注与维护</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-diagram-3"></i></span>
+        <div class="module-metric-copy">
+            <small>模块 / 环境</small>
+            <strong>{{ project_stats.modules }} / {{ project_stats.environments }}</strong>
+            <span>最近活跃 {{ project_stats.recent }} 个项目</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
 
-        <aside class="project-side-column" id="projectSidePanel" aria-hidden="true">
-            <div class="project-side-panel-title">
-                <div><i class="bi bi-grid"></i><span>快捷侧栏</span></div>
-                <button type="button" class="project-side-close" id="projectSideClose" aria-label="收起快捷侧栏"><i class="bi bi-chevron-right"></i></button>
-            </div>
-            <section class="project-side-card">
-                <header><h3><i class="bi bi-lightning-charge"></i>快捷入口</h3></header>
-                <div class="project-quick-grid">
-                    {% if has_permission('project:create') %}
-                    <button type="button" data-bs-toggle="offcanvas" data-bs-target="#createProjectDrawer"><i class="bi bi-plus-lg"></i><span>新建项目</span></button>
-                    {% endif %}
-                    {% if has_permission('module:view') %}
-                    <a href="{{ url_for('module.list_modules') }}"><i class="bi bi-diagram-3"></i><span>模块管理</span></a>
-                    {% endif %}
-                    {% if has_permission('environment:view') %}
-                    <a href="{{ url_for('environment.list_environments') }}"><i class="bi bi-sliders"></i><span>环境配置</span></a>
-                    {% endif %}
-                    {% if has_permission('testcase:view') %}
-                    <a href="{{ url_for('testcase.list_testcases') }}"><i class="bi bi-card-checklist"></i><span>用例管理</span></a>
-                    {% endif %}
-                </div>
-            </section>
-
-            <section class="project-side-card">
-                <header><h3><i class="bi bi-clock-history"></i>最近项目</h3><span>{{ projects | length }} 个</span></header>
-                <div class="project-activity-list">
-                    {% for item in projects[:4] %}
-                    <div class="project-activity-item">
-                        <span class="activity-dot"></span>
-                        <div><strong>{{ item.name }}</strong><small>{{ (item.updated_at or item.created_at) | bjt }}</small></div>
-                    </div>
-                    {% else %}
-                    <div class="project-side-empty">暂无最近项目</div>
-                    {% endfor %}
-                </div>
-            </section>
-
-            <section class="project-side-card project-ai-tips">
-                <header><h3><i class="bi bi-stars"></i>AI 推荐</h3></header>
-                <a href="{{ url_for('ai.parser_page') if has_permission('ai:use') else '#' }}"><span><i class="bi bi-file-earmark-code"></i></span><div><strong>基于接口文档生成项目</strong><small>智能解析 OpenAPI / Swagger</small></div><i class="bi bi-chevron-right"></i></a>
-                <a href="{{ url_for('ui_auto.index') if has_permission('uiauto:view') else '#' }}"><span><i class="bi bi-display"></i></span><div><strong>生成 UI 自动化脚本</strong><small>复用项目环境与定位器</small></div><i class="bi bi-chevron-right"></i></a>
-            </section>
-        </aside>
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 智能辅助</span>
+            <small>全新升级</small>
+        </div>
+        <p>快速解析接口文档、生成项目结构建议，减少重复配置。</p>
     </div>
-</div>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('ai.parser_page') }}">
+        立即体验
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
 
+{% block workspace_filter %}
+<section class="card module-filter-card">
+    <div class="card-body module-filter-body">
+        <form method="get" action="{{ url_for('project.list_projects') }}" class="module-filter-form">
+            <div class="module-filter-grid project-filter-grid">
+                <div class="module-field">
+                    <label class="form-label">关键词</label>
+                    <input class="form-control" type="text" name="keyword" value="{{ keyword or '' }}" placeholder="搜索项目名称">
+                </div>
+                <div class="module-field">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>启用中</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>已停用</option>
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">模块数</label>
+                    <select class="form-select" name="module_scope">
+                        <option value="">全部模块数</option>
+                        <option value="many">10+</option>
+                        <option value="few">1-9</option>
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">环境数</label>
+                    <select class="form-select" name="environment_scope">
+                        <option value="">全部环境数</option>
+                        <option value="many">5+</option>
+                        <option value="few">1-4</option>
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">最近更新</label>
+                    <select class="form-select" name="recent">
+                        <option value="">全部时间</option>
+                        <option value="7">近 7 天</option>
+                        <option value="30">近 30 天</option>
+                    </select>
+                </div>
+                <div class="module-filter-actions">
+                    <button class="btn btn-primary" type="submit">查询</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('project.list_projects') }}">重置</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_list %}
+<section class="card module-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>项目列表</strong>
+            <small>共 {{ projects | length }} 个项目，按最近更新时间排序</small>
+        </div>
+        <div class="module-list-tools">
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-upload"></i>批量导入</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-download"></i>导出</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-three-dots"></i>更多操作</button>
+        </div>
+    </div>
+    <div class="card-body module-list-body">
+        {% if projects %}
+        <div class="table-responsive module-table-wrap">
+            <table class="table align-middle module-table project-table">
+                <thead>
+                <tr>
+                    <th style="width: 72px;">ID</th>
+                    <th style="width: 220px;">项目名称</th>
+                    <th style="width: 320px;">描述</th>
+                    <th style="width: 112px;">状态</th>
+                    <th style="width: 132px;">资源</th>
+                    <th style="width: 168px;">最近更新时间</th>
+                    <th style="width: 176px;">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in projects %}
+                {% if item.status == 'active' %}
+                    {% set status_label = '启用中' %}
+                    {% set status_class = 'status-active' %}
+                {% else %}
+                    {% set status_label = '已停用' %}
+                    {% set status_class = 'status-muted' %}
+                {% endif %}
+                <tr>
+                    <td class="module-id-cell">{{ item.id }}</td>
+                    <td>
+                        <div class="module-name-cell">
+                            <span class="module-row-icon icon-{{ loop.index0 % 4 }}"><i class="bi bi-folder2"></i></span>
+                            <div>
+                                <strong>{{ item.name }}</strong>
+                                <small>PROJECT-{{ '%03d' | format(item.id) }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="module-description-cell">{{ item.description or '暂无项目描述' }}</td>
+                    <td>
+                        <span class="module-status-chip {{ status_class }}">
+                            <i class="bi bi-dot"></i>{{ status_label }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="module-chip module-count-chip">{{ item.modules | length }} 模块</span>
+                        <span class="module-chip module-count-chip">{{ item.environments | length }} 环境</span>
+                    </td>
+                    <td class="module-time-cell">{{ (item.updated_at or item.created_at) | bjt }}</td>
+                    <td>
+                        <div class="module-row-actions">
+                            {% if has_permission('project:edit') %}
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#editProjectDrawer{{ item.id }}">查看</button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#editProjectDrawer{{ item.id }}">编辑</button>
+                            {% endif %}
+                            {% if has_permission('project:delete') %}
+                            <form method="post" action="{{ url_for('project.delete_project', project_id=item.id) }}" onsubmit="return confirm('确认删除该项目及其关联数据吗？');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>删除</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="module-pagination">
+            <div class="module-pagination-info">共 {{ projects | length }} 条</div>
+            <div class="module-pagination-controls">
+                <button class="btn btn-outline-secondary btn-sm" type="button" disabled><i class="bi bi-chevron-left"></i></button>
+                <button class="btn btn-primary btn-sm" type="button">1</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" disabled><i class="bi bi-chevron-right"></i></button>
+                <span>前往</span>
+                <input type="text" value="1" aria-label="页码">
+                <span>页</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="module-empty-state">
+            <span><i class="bi bi-folder-plus"></i></span>
+            <strong>当前还没有项目</strong>
+            <p>新建项目后，可以继续维护模块、环境和测试资源配置。</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>最近动态</strong>
+        <a href="javascript:void(0)">查看全部</a>
+    </div>
+    <div class="card-body module-side-body">
+        {% if projects %}
+        <div class="module-activity-list">
+            {% for item in projects[:4] %}
+            <div class="module-activity-item">
+                <span class="module-activity-icon icon-{{ loop.index0 % 4 }}">
+                    <i class="bi bi-folder2"></i>
+                </span>
+                <div class="module-activity-copy">
+                    <strong>{{ item.name }} 有更新</strong>
+                    <small>{{ (item.updated_at or item.created_at) | bjt }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="module-rail-empty">暂无动态</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            {% if has_permission('project:create') %}
+            <button class="module-quick-item" type="button" data-bs-toggle="offcanvas" data-bs-target="#createProjectDrawer">
+                <i class="bi bi-plus-lg"></i>
+                <span>新建项目</span>
+            </button>
+            {% endif %}
+            {% if has_permission('module:view') %}
+            <a class="module-quick-item" href="{{ url_for('module.list_modules') }}">
+                <i class="bi bi-diagram-3"></i>
+                <span>模块管理</span>
+            </a>
+            {% endif %}
+            {% if has_permission('environment:view') %}
+            <a class="module-quick-item" href="{{ url_for('environment.list_environments') }}">
+                <i class="bi bi-sliders"></i>
+                <span>环境配置</span>
+            </a>
+            {% endif %}
+            {% if has_permission('testcase:view') %}
+            <a class="module-quick-item" href="{{ url_for('testcase.list_testcases') }}">
+                <i class="bi bi-card-checklist"></i>
+                <span>用例管理</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+        <button class="module-side-refresh" type="button">换一换</button>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="{{ url_for('ai.parser_page') }}">
+                <span class="module-insight-icon icon-0"><i class="bi bi-file-earmark-code"></i></span>
+                <div>
+                    <strong>基于接口文档生成项目</strong>
+                    <small>快速解析 OpenAPI / Swagger，减少重复配置</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('ui_auto.index') }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-display"></i></span>
+                <div>
+                    <strong>生成 UI 自动化脚本</strong>
+                    <small>复用项目环境与定位器信息</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_drawers %}
 {% if has_permission('project:create') %}
-<div class="offcanvas offcanvas-end app-edit-drawer project-drawer" tabindex="-1" id="createProjectDrawer">
+<div class="offcanvas offcanvas-end app-edit-drawer api-form-drawer" tabindex="-1" id="createProjectDrawer">
     <div class="offcanvas-header">
-        <div><h5 class="offcanvas-title">新建项目</h5><small>创建新的测试项目与基础配置</small></div>
+        <div>
+            <h5 class="offcanvas-title">新建项目</h5>
+            <small>创建新的测试项目与基础配置</small>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
     <form method="post" action="{{ url_for('project.create_project') }}" class="offcanvas-body drawer-form">
         <div class="drawer-section">
             <div class="drawer-section-title">基础信息</div>
-            <div class="mb-3"><label class="form-label">项目名称</label><input type="text" class="form-control" name="name" placeholder="请输入项目名称" required></div>
-            <div><label class="form-label">项目描述</label><textarea class="form-control" name="description" rows="5" placeholder="说明项目目标、业务范围或维护信息"></textarea></div>
+            <div class="mb-3">
+                <label class="form-label">项目名称</label>
+                <input type="text" class="form-control" name="name" placeholder="请输入项目名称" required>
+            </div>
+            <div>
+                <label class="form-label">项目描述</label>
+                <textarea class="form-control" name="description" rows="5" placeholder="说明项目目标、业务范围或维修信息"></textarea>
+            </div>
         </div>
-        <div class="drawer-actions"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button><button class="btn btn-primary" type="submit">创建项目</button></div>
+        <div class="drawer-actions">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+            <button class="btn btn-primary" type="submit">创建项目</button>
+        </div>
     </form>
 </div>
 {% endif %}
 
 {% if has_permission('project:edit') %}
 {% for item in projects %}
-<div class="offcanvas offcanvas-end app-edit-drawer project-drawer" tabindex="-1" id="editProjectDrawer{{ item.id }}">
+<div class="offcanvas offcanvas-end app-edit-drawer api-form-drawer" tabindex="-1" id="editProjectDrawer{{ item.id }}">
     <div class="offcanvas-header">
-        <div><h5 class="offcanvas-title">编辑项目</h5><small>PROJECT-{{ '%03d' | format(item.id) }} · {{ item.name }}</small></div>
+        <div>
+            <h5 class="offcanvas-title">编辑项目</h5>
+            <small>PROJECT-{{ '%03d' | format(item.id) }} · {{ item.name }}</small>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
     <form method="post" action="{{ url_for('project.edit_project', project_id=item.id) }}" class="offcanvas-body drawer-form">
         <div class="drawer-section">
             <div class="drawer-section-title">基础信息</div>
-            <div class="mb-3"><label class="form-label">项目名称</label><input class="form-control" name="name" value="{{ item.name }}" required></div>
-            <div class="mb-3"><label class="form-label">项目描述</label><textarea class="form-control" name="description" rows="5">{{ item.description }}</textarea></div>
-            <div><label class="form-label">项目状态</label><select class="form-select" name="status"><option value="active" {% if item.status == 'active' %}selected{% endif %}>启用</option><option value="inactive" {% if item.status == 'inactive' %}selected{% endif %}>停用</option></select></div>
+            <div class="mb-3">
+                <label class="form-label">项目名称</label>
+                <input class="form-control" name="name" value="{{ item.name }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">项目描述</label>
+                <textarea class="form-control" name="description" rows="5">{{ item.description }}</textarea>
+            </div>
+            <div>
+                <label class="form-label">项目状态</label>
+                <select class="form-select" name="status">
+                    <option value="active" {% if item.status == 'active' %}selected{% endif %}>启用中</option>
+                    <option value="inactive" {% if item.status == 'inactive' %}selected{% endif %}>已停用</option>
+                </select>
+            </div>
         </div>
-        <div class="drawer-actions"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button><button class="btn btn-primary" type="submit">保存修改</button></div>
+        <div class="drawer-actions">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+            <button class="btn btn-primary" type="submit">保存修改</button>
+        </div>
     </form>
 </div>
 {% endfor %}
 {% endif %}
-{% endblock %}
-
-{% block scripts %}
-{{ super() }}
-<script>
-(() => {
-    const layout = document.getElementById("projectLayout");
-    const panel = document.getElementById("projectSidePanel");
-    const toggle = document.getElementById("projectSideToggle");
-    const close = document.getElementById("projectSideClose");
-    if (!layout || !panel || !toggle) return;
-
-    const setSidePanel = (isOpen) => {
-        layout.classList.toggle("is-side-open", isOpen);
-        toggle.classList.toggle("is-open", isOpen);
-        toggle.setAttribute("aria-expanded", String(isOpen));
-        toggle.setAttribute("title", isOpen ? "收起快捷侧栏" : "展开快捷侧栏");
-        panel.setAttribute("aria-hidden", String(!isOpen));
-    };
-
-    toggle.addEventListener("click", () => {
-        setSidePanel(!layout.classList.contains("is-side-open"));
-    });
-    close?.addEventListener("click", () => setSidePanel(false));
-})();
-</script>
 {% endblock %}

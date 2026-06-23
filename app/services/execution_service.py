@@ -16,6 +16,7 @@ from app.utils.assertion_engine import run_assertions
 from app.utils.extractor import extract_variables
 from app.utils.helpers import safe_response_json, truncate_text
 from app.utils.request_builder import build_request_data
+from app.utils.trigger import normalize_trigger_type
 
 
 class ExecutionService:
@@ -44,7 +45,15 @@ class ExecutionService:
         return execution
 
     @staticmethod
-    def create_execution(project_id, environment_id, execution_type, target_type, target_id):
+    def create_execution(
+        project_id,
+        environment_id,
+        execution_type,
+        target_type,
+        target_id,
+        trigger_type="automatic",
+        trigger_user_id=None,
+    ):
         project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("所属项目不存在。")
@@ -61,6 +70,8 @@ class ExecutionService:
             execution_type=execution_type,
             target_type=target_type,
             target_id=target_id,
+            trigger_type=normalize_trigger_type(trigger_type),
+            trigger_user_id=trigger_user_id,
             status="running",
             started_at=datetime.utcnow(),
         )
@@ -194,7 +205,12 @@ class ExecutionService:
         return execution
 
     @staticmethod
-    def run_testcase(testcase_id, environment_id):
+    def run_testcase(
+        testcase_id,
+        environment_id,
+        trigger_type="automatic",
+        trigger_user_id=None,
+    ):
         testcase = db.session.get(TestCase, testcase_id)
         if not testcase:
             raise ServiceError("用例不存在。")
@@ -212,6 +228,8 @@ class ExecutionService:
             execution_type="single",
             target_type="testcase",
             target_id=testcase.id,
+            trigger_type=trigger_type,
+            trigger_user_id=trigger_user_id,
         )
 
         runtime_variables = VariableService.build_runtime_variables(
@@ -255,6 +273,8 @@ class ExecutionService:
             "environment_base_url": environment.base_url,
             "runtime_variables": runtime_variables,
             "last_extracted_values": case_result["extracted_values"],
+            "trigger_type": execution.trigger_type,
+            "trigger_person": execution.trigger_person_name,
         }
 
         ExecutionService.finish_execution(
@@ -272,7 +292,12 @@ class ExecutionService:
         return ExecutionService.get_by_id(execution.id)
 
     @staticmethod
-    def run_module(module_id, environment_id):
+    def run_module(
+        module_id,
+        environment_id,
+        trigger_type="automatic",
+        trigger_user_id=None,
+    ):
         module = db.session.get(Module, module_id)
         if not module:
             raise ServiceError("模块不存在。")
@@ -292,10 +317,17 @@ class ExecutionService:
             execution_type="batch",
             target_type="module",
             target_id=module.id,
+            trigger_type=trigger_type,
+            trigger_user_id=trigger_user_id,
         )
 
     @staticmethod
-    def run_selected_testcases(testcase_ids, environment_id):
+    def run_selected_testcases(
+        testcase_ids,
+        environment_id,
+        trigger_type="automatic",
+        trigger_user_id=None,
+    ):
         normalized_ids = []
         for testcase_id in testcase_ids or []:
             try:
@@ -343,10 +375,17 @@ class ExecutionService:
             target_type="selection",
             target_id=0,
             summary_extra=summary_extra,
+            trigger_type=trigger_type,
+            trigger_user_id=trigger_user_id,
         )
 
     @staticmethod
-    def run_project(project_id, environment_id):
+    def run_project(
+        project_id,
+        environment_id,
+        trigger_type="automatic",
+        trigger_user_id=None,
+    ):
         project = db.session.get(Project, project_id)
         if not project:
             raise ServiceError("项目不存在。")
@@ -366,6 +405,8 @@ class ExecutionService:
             execution_type="batch",
             target_type="project",
             target_id=project.id,
+            trigger_type=trigger_type,
+            trigger_user_id=trigger_user_id,
         )
 
     @staticmethod
@@ -377,6 +418,8 @@ class ExecutionService:
         target_type,
         target_id,
         summary_extra=None,
+        trigger_type="automatic",
+        trigger_user_id=None,
     ):
         environment = ExecutionService.get_active_environment(
             project_id=project_id,
@@ -389,6 +432,8 @@ class ExecutionService:
             execution_type=execution_type,
             target_type=target_type,
             target_id=target_id,
+            trigger_type=trigger_type,
+            trigger_user_id=trigger_user_id,
         )
 
         runtime_variables = VariableService.build_runtime_variables(
@@ -444,6 +489,8 @@ class ExecutionService:
             "environment_base_url": environment.base_url,
             "runtime_variables": runtime_variables,
             "failed_cases": failed_cases,
+            "trigger_type": execution.trigger_type,
+            "trigger_person": execution.trigger_person_name,
         }
         if summary_extra:
             summary.update(summary_extra)
@@ -551,15 +598,18 @@ class ExecutionService:
                 "json": response_json,
             }
 
+            extracted_values, extract_results = extract_variables(
+                extract_rules=testcase_data.get("extract", {}),
+                response_json=response_json,
+            )
+
+            assertion_variables = dict(runtime_variables)
+            assertion_variables.update(extracted_values)
             passed, assertion_results = run_assertions(
                 assertions=testcase_data.get("assertions", []),
                 response_snapshot=response_snapshot,
                 duration_ms=duration_ms,
-            )
-
-            extracted_values, extract_results = extract_variables(
-                extract_rules=testcase_data.get("extract", {}),
-                response_json=response_json,
+                runtime_variables=assertion_variables,
             )
 
             status = "passed" if passed else "failed"

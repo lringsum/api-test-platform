@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app.routes import handle_page_error
@@ -9,7 +11,12 @@ from app.services.project_service import ProjectService
 from app.services.scenario_service import ScenarioService
 from app.services.testcase_service import TestCaseService
 from app.project_context import resolve_project_id
-from app.security import accessible_project_ids, accessible_projects, require_permission
+from app.security import (
+    accessible_project_ids,
+    accessible_projects,
+    get_current_user,
+    require_permission,
+)
 
 scenario_bp = Blueprint("scenario", __name__, url_prefix="/scenarios")
 
@@ -17,10 +24,11 @@ scenario_bp = Blueprint("scenario", __name__, url_prefix="/scenarios")
 @scenario_bp.route("/")
 @require_permission("scenario:view")
 def list_scenarios():
-    project_id = resolve_project_id()
+    project_id = request.args.get("project_id", type=int) or resolve_project_id()
     module_id = request.args.get("module_id", type=int)
     status = request.args.get("status", "").strip()
     keyword = request.args.get("keyword", "").strip()
+    recent_cutoff = datetime.utcnow() - timedelta(days=7)
 
     scenarios = ScenarioService.list_all(
         project_id=project_id,
@@ -28,6 +36,24 @@ def list_scenarios():
         status=status or None,
         keyword=keyword or None,
     )
+    scenario_rows = [
+        {
+            "scenario": scenario,
+            "step_count": len(scenario.steps or []),
+        }
+        for scenario in scenarios
+    ]
+    scenario_stats = {
+        "total": len(scenario_rows),
+        "active": sum(1 for row in scenario_rows if row["scenario"].status == "active"),
+        "inactive": sum(1 for row in scenario_rows if row["scenario"].status != "active"),
+        "recent": sum(
+            1
+            for row in scenario_rows
+            if row["scenario"].updated_at and row["scenario"].updated_at >= recent_cutoff
+        ),
+        "steps": sum(row["step_count"] for row in scenario_rows),
+    }
     projects = accessible_projects()
     modules = ModuleService.list_all(project_id=project_id) if project_id else []
     project_ids = accessible_project_ids()
@@ -37,6 +63,8 @@ def list_scenarios():
     return render_template(
         "scenarios/list.html",
         scenarios=scenarios,
+        scenario_rows=scenario_rows,
+        scenario_stats=scenario_stats,
         projects=projects,
         modules=modules,
         all_modules=all_modules,
@@ -45,6 +73,7 @@ def list_scenarios():
         selected_module_id=module_id,
         selected_status=status,
         keyword=keyword,
+        recent_cutoff=recent_cutoff,
     )
 
 
@@ -70,18 +99,30 @@ def create_scenario():
 @require_permission("scenario:edit")
 def edit_scenario_page(scenario_id):
     scenario = ScenarioService.get_by_id(scenario_id)
+    scenario_steps = list(scenario.steps or [])
     projects = accessible_projects()
-    modules = ModuleService.list_all(project_id=scenario.project_id)
-    testcases = TestCaseService.list_all(project_id=scenario.project_id)
-    environments = EnvironmentService.list_all(project_id=scenario.project_id)
+    modules = list(ModuleService.list_all(project_id=scenario.project_id) or [])
+    testcases = list(TestCaseService.list_all(project_id=scenario.project_id) or [])
+    environments = list(EnvironmentService.list_all(project_id=scenario.project_id) or [])
+    recent_executions = ScenarioExecutionService.list_all(
+        project_id=scenario.project_id,
+        scenario_id=scenario.id,
+        page=1,
+        per_page=4,
+    )
     return render_template(
         "scenarios/edit.html",
         scenario=scenario,
+        scenario_steps=scenario_steps,
+        step_total=len(scenario_steps),
+        enabled_step_count=sum(1 for step in scenario_steps if step.is_enabled),
         projects=projects,
         modules=modules,
         testcases=testcases,
         environments=environments,
         tags_text=ScenarioService.format_tags(scenario.tags),
+        recent_execution_items=list(recent_executions.items or []),
+        recent_execution_count=len(recent_executions.items or []),
     )
 
 
@@ -118,9 +159,12 @@ def delete_scenario(scenario_id):
 @require_permission("scenario:run")
 def run_scenario(scenario_id):
     try:
+        current_user = get_current_user()
         execution = ScenarioExecutionService.run_scenario(
             scenario_id=scenario_id,
             environment_id=request.form.get("environment_id", type=int),
+            trigger_type="manual",
+            trigger_user_id=current_user.id if current_user else None,
             persist_extracted_to_environment=request.form.get("persist_extracted_to_environment") == "1",
         )
         flash("场景执行完成。", "success")
@@ -220,7 +264,7 @@ def move_scenario_step_down(scenario_step_id):
 @scenario_bp.route("/executions/history")
 @require_permission("scenario:view")
 def scenario_execution_history():
-    project_id = resolve_project_id()
+    project_id = request.args.get("project_id", type=int) or resolve_project_id()
     scenario_id = request.args.get("scenario_id", type=int)
     environment_id = request.args.get("environment_id", type=int)
     status = (request.args.get("status") or "").strip()
@@ -247,6 +291,7 @@ def scenario_execution_history():
         selected_scenario_id=scenario_id,
         selected_environment_id=environment_id,
         selected_status=status,
+        recent_cutoff=datetime.utcnow() - timedelta(days=7),
     )
 
 
@@ -254,16 +299,35 @@ def scenario_execution_history():
 @require_permission("scenario:view")
 def scenario_execution_detail(scenario_execution_id):
     execution = ScenarioExecutionService.get_execution_by_id(scenario_execution_id)
-    return render_template("scenarios/detail.html", execution=execution)
+    scenario = execution.scenario
+    recent_executions = ScenarioExecutionService.list_all(
+        project_id=scenario.project_id,
+        scenario_id=scenario.id,
+        page=1,
+        per_page=4,
+    )
+    return render_template(
+        "scenarios/detail.html",
+        execution=execution,
+        scenario=scenario,
+        project=scenario.project,
+        environment=execution.environment,
+        projects=accessible_projects(),
+        recent_executions=recent_executions.items,
+        recent_cutoff=datetime.utcnow() - timedelta(days=7),
+    )
 
 
 @scenario_bp.route("/executions/<int:scenario_execution_id>/rerun", methods=["POST"])
 @require_permission("scenario:run")
 def rerun_scenario_execution(scenario_execution_id):
     try:
+        current_user = get_current_user()
         execution = ScenarioExecutionService.rerun(
             scenario_execution_id=scenario_execution_id,
             persist_extracted_to_environment=request.form.get("persist_extracted_to_environment") == "1",
+            trigger_type="manual",
+            trigger_user_id=current_user.id if current_user else None,
         )
         flash("场景重跑完成。", "success")
         return redirect(url_for("scenario.scenario_execution_detail", scenario_execution_id=execution.id))

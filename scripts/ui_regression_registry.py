@@ -24,7 +24,7 @@ PAGE_REGISTRY = [
         module="project",
         path="/projects/",
         page_title="项目管理",
-        ready_markers=("项目工作台", "项目列表", "快捷入口"),
+        ready_markers=("module-filter-card", "module-list-card", "createProjectDrawer"),
     ),
     PageSpec(
         name="modules",
@@ -52,14 +52,14 @@ PAGE_REGISTRY = [
         module="testcase",
         path="/testcases/",
         page_title="用例管理",
-        ready_markers=("查询条件",),
+        ready_markers=("用例列表", "接口目录"),
     ),
     PageSpec(
         name="scenarios",
         module="scenario",
         path="/scenarios/",
         page_title="场景管理",
-        ready_markers=("查询条件",),
+        ready_markers=("场景列表", "createScenarioDrawer", "scenarioCreateProject"),
     ),
     PageSpec(
         name="ai-parser",
@@ -80,7 +80,14 @@ PAGE_REGISTRY = [
         module="execution",
         path="/executions/history",
         page_title="执行历史",
-        ready_markers=("执行记录",),
+        ready_markers=("执行记录", "触发类型", "触发人员"),
+    ),
+    PageSpec(
+        name="scenario-history",
+        module="scenario",
+        path="/scenarios/executions/history",
+        page_title="场景执行历史",
+        ready_markers=("场景执行历史", "触发类型", "触发人员"),
     ),
     PageSpec(
         name="ui-scripts",
@@ -101,14 +108,14 @@ PAGE_REGISTRY = [
         module="ui-automation",
         path="/ui-automation/executions",
         page_title="UI 执行计划",
-        ready_markers=("执行配置", "Playwright Worker 已接入"),
+        ready_markers=("执行配置", "Playwright Worker 已接入", "触发类型", "触发人员"),
     ),
     PageSpec(
         name="ui-replays",
         module="ui-automation",
         path="/ui-automation/replays",
         page_title="UI 报告回放",
-        ready_markers=("uiReplayPage", "replayFilterForm"),
+        ready_markers=("uiReplayPage", "replayFilterForm", "触发类型", "触发人员"),
     ),
     PageSpec(
         name="reports",
@@ -139,6 +146,16 @@ BROWSER_SCENARIOS = [
         "kind": "anomaly",
     },
     {
+        "name": "scenario_management_smoke",
+        "module": "scenario",
+        "kind": "smoke",
+    },
+    {
+        "name": "scenario_management_empty",
+        "module": "scenario",
+        "kind": "anomaly",
+    },
+    {
         "name": "execution_smoke",
         "module": "execution",
         "kind": "smoke",
@@ -147,6 +164,9 @@ BROWSER_SCENARIOS = [
         "expected_module_name": "初始化模块",
         "expected_testcase_keyword": "init",
         "expect_checklist": True,
+        "expect_selected_button_feedback_without_environment": True,
+        "expect_testcase_run_link_with_project": True,
+        "expect_context_card": True,
     },
     {
         "name": "execution_anomaly_empty",

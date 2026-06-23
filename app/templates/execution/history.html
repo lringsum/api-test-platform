@@ -1,94 +1,210 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
+{% from "shared/execution_rail.html" import render_execution_rail %}
+{% from "shared/execution_actions.html" import render_execution_actions %}
 
 {% block title %}执行历史{% endblock %}
 {% block page_title %}执行历史{% endblock %}
-{% block page_desc %}查看历史执行批次与报告入口{% endblock %}
+{% block page_desc %}查看历史执行批次、状态分布和报告入口，统一延续 workbench 视觉体系{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
-{% block content %}
-<div class="card mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <strong>查询条件</strong>
-        <small class="text-muted">按当前项目查询执行历史</small>
+{% set workspace_page_class = 'execution-history-page' %}
+{% set workspace_layout_class = 'execution-history-layout' %}
+
+{% block workspace_heading %}执行历史{% endblock %}
+{% block workspace_subtitle %}查看历史执行批次、状态分布和报告入口，统一延续 workbench 视觉体系{% endblock %}
+
+{% block workspace_actions %}
+{{ render_execution_actions('history') }}
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-clock-history"></i></span>
+        <div class="module-metric-copy">
+            <small>执行总数</small>
+            <strong>{{ execution_total }}</strong>
+            <span>当前筛选条件下的记录</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-check2-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>成功批次</small>
+            <strong>{{ passed_total }}</strong>
+            <span>状态为成功的执行</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-x-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>失败批次</small>
+            <strong>{{ failed_total }}</strong>
+            <span>状态为失败的执行</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-stopwatch"></i></span>
+        <div class="module-metric-copy">
+            <small>平均耗时</small>
+            <strong>{{ avg_duration }} ms</strong>
+            <span>近 7 日活跃 {{ recent_total }} 条</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 执行洞察</span>
+            <small>历史分析</small>
+        </div>
+        <p>把执行状态、通过率和报告入口放在同一视图里，方便快速找出需要复盘的批次。</p>
+    </div>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('execution.run_page') }}">
+        立即执行
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card execution-history-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>筛选条件</strong>
+            <small>按状态和执行类型快速缩小历史范围</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-chip module-count-chip">当前项目</span>
+        </div>
     </div>
     <div class="card-body">
-        <form method="get" action="{{ url_for('execution.history_page') }}" class="d-flex flex-wrap align-items-center gap-3">
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
-                <a class="btn btn-outline-secondary" href="{{ url_for('execution.history_page') }}" title="重置"><i class="bi bi-eraser"></i></a>
+        <form method="get" action="{{ url_for('execution.history_page') }}" class="module-filter-form execution-history-filter">
+            <div class="module-filter-grid execution-history-grid">
+                <div class="module-field">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="running" {% if selected_status == 'running' %}selected{% endif %}>运行中</option>
+                        <option value="passed" {% if selected_status == 'passed' %}selected{% endif %}>成功</option>
+                        <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>失败</option>
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">执行类型</label>
+                    <select class="form-select" name="execution_type">
+                        <option value="">全部类型</option>
+                        <option value="single" {% if selected_execution_type == 'single' %}selected{% endif %}>单用例</option>
+                        <option value="batch" {% if selected_execution_type == 'batch' %}selected{% endif %}>批量</option>
+                        <option value="project" {% if selected_execution_type == 'project' %}selected{% endif %}>项目</option>
+                    </select>
+                </div>
+                <div class="module-filter-actions">
+                    <button class="btn btn-primary" type="submit">查询</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('execution.history_page') }}">重置</a>
+                    <a class="btn btn-link module-expand-link" href="{{ url_for('report.list_reports') }}">报告列表</a>
+                </div>
             </div>
         </form>
     </div>
-</div>
+</section>
+{% endblock %}
 
-<div class="card">
-    <div class="card-header bg-white"><strong>执行记录</strong></div>
+{% block workspace_list %}
+<section class="card execution-history-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>执行记录</strong>
+            <small>共 {{ pagination.total }} 条，按时间倒序排列</small>
+        </div>
+        <div class="module-list-tools">
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('execution.run_page') }}"><i class="bi bi-play-circle"></i>立即执行</a>
+        </div>
+    </div>
     <div class="card-body">
         {% if pagination.items %}
         <div class="table-responsive">
-            <table class="table table-hover table-bordered">
+            <table class="table align-middle report-summary-table execution-history-table">
                 <thead>
                 <tr>
-                    <th>ID</th>
+                    <th style="width: 80px;">ID</th>
                     <th>项目</th>
                     <th>环境</th>
                     <th>执行时间</th>
-                    <th>执行类型</th>
-                    <th>目标类型</th>
+                    <th>触发类型</th>
+                    <th>触发人员</th>
                     <th>状态</th>
                     <th>总数</th>
                     <th>通过</th>
                     <th>失败</th>
                     <th>通过率</th>
                     <th>平均耗时(ms)</th>
-                    <th width="180">操作</th>
+                    <th style="width: 220px;">操作</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for item in pagination.items %}
+                {% set avg_item_duration = '%.2f'|format((item.total_duration_ms / item.total_count) if item.total_count > 0 else 0) %}
                 <tr>
-                    <td>{{ item.id }}</td>
+                    <td class="fw-semibold">{{ item.id }}</td>
                     <td>{{ item.project.name }}</td>
                     <td>{{ item.environment.name if item.environment else '-' }}</td>
                     <td>{{ (item.started_at or item.created_at) | bjt }}</td>
-                    <td>{{ item.execution_type }}</td>
-                    <td>{{ '选中用例' if item.target_type == 'selection' else item.target_type }}</td>
+                    <td><span class="module-chip module-count-chip">{{ item.trigger_type_label }}</span></td>
+                    <td>{{ item.trigger_person_name }}</td>
                     <td>
                         {% if item.status == 'passed' %}
-                        <span class="badge bg-success">成功</span>
+                        <span class="module-status-chip status-active"><i class="bi bi-dot"></i>成功</span>
                         {% elif item.status == 'failed' %}
-                        <span class="badge bg-danger">失败</span>
+                        <span class="module-status-chip status-muted"><i class="bi bi-dot"></i>失败</span>
                         {% else %}
-                        <span class="badge bg-secondary">{{ item.status }}</span>
+                        <span class="module-status-chip status-pending"><i class="bi bi-dot"></i>{{ item.status }}</span>
                         {% endif %}
                     </td>
                     <td>{{ item.total_count }}</td>
                     <td>{{ item.passed_count }}</td>
                     <td>{{ item.failed_count }}</td>
                     <td>{{ item.pass_rate }}%</td>
-                    <td>{{ '%.2f'|format((item.total_duration_ms / item.total_count) if item.total_count > 0 else 0) }}</td>
-                    <td class="d-flex gap-2">
-                        {% if has_permission('execution:view') %}
-                        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('execution.detail_page', execution_id=item.id) }}"><i class="bi bi-file-text me-1"></i>详情</a>
-                        {% endif %}
-                        {% if has_permission('report:view') %}
-                            {% if item.report %}
-                            <a class="btn btn-sm btn-outline-success" href="{{ url_for('report.detail_report', report_id=item.report.id) }}"><i class="bi bi-bar-chart-fill me-1"></i>报告</a>
-                            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('execution.execution_report_page', execution_id=item.id) }}"><i class="bi bi-arrow-repeat me-1"></i>回放</a>
-                            {% else %}
-                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('execution.execution_report_page', execution_id=item.id) }}"><i class="bi bi-plus-circle me-1"></i>生成报告</a>
+                    <td>{{ avg_item_duration }}</td>
+                    <td>
+                        <div class="testcase-action-group execution-action-group">
+                            {% if has_permission('execution:view') %}
+                            <a class="btn btn-sm btn-outline-primary testcase-action-btn" href="{{ url_for('execution.detail_page', execution_id=item.id) }}"><i class="bi bi-file-text me-1"></i>详情</a>
                             {% endif %}
-                        {% endif %}
+                            {% if has_permission('report:view') %}
+                                {% if item.report %}
+                                <a class="btn btn-sm btn-outline-success testcase-action-btn" href="{{ url_for('report.detail_report', report_id=item.report.id) }}"><i class="bi bi-bar-chart-fill me-1"></i>报告</a>
+                                {% endif %}
+                                <a class="btn btn-sm btn-outline-secondary testcase-action-btn" href="{{ url_for('execution.execution_report_page', execution_id=item.id) }}"><i class="bi bi-arrow-repeat me-1"></i>回放</a>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
+
         {% if pagination.pages > 1 %}
         <nav aria-label="Page navigation" class="mt-4">
             <ul class="pagination justify-content-center mb-0">
                 <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('execution.history_page', page=pagination.prev_num, project_id=request.args.get('project_id')) }}" aria-label="Previous">
+                    <a class="page-link" href="{{ url_for('execution.history_page', page=pagination.prev_num, status=selected_status, execution_type=selected_execution_type) }}" aria-label="Previous">
                         <span aria-hidden="true">&laquo;</span>
                     </a>
                 </li>
@@ -97,14 +213,14 @@
                         {% if pagination.page == page_num %}
                         <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
                         {% else %}
-                        <li class="page-item"><a class="page-link" href="{{ url_for('execution.history_page', page=page_num, project_id=request.args.get('project_id')) }}">{{ page_num }}</a></li>
+                        <li class="page-item"><a class="page-link" href="{{ url_for('execution.history_page', page=page_num, status=selected_status, execution_type=selected_execution_type) }}">{{ page_num }}</a></li>
                         {% endif %}
                     {% else %}
                         <li class="page-item disabled"><span class="page-link">...</span></li>
                     {% endif %}
                 {% endfor %}
                 <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('execution.history_page', page=pagination.next_num, project_id=request.args.get('project_id')) }}" aria-label="Next">
+                    <a class="page-link" href="{{ url_for('execution.history_page', page=pagination.next_num, status=selected_status, execution_type=selected_execution_type) }}" aria-label="Next">
                         <span aria-hidden="true">&raquo;</span>
                     </a>
                 </li>
@@ -112,8 +228,24 @@
         </nav>
         {% endif %}
         {% else %}
-        <div class="empty-box">暂无执行历史</div>
+        <div class="module-empty-state">
+            <span><i class="bi bi-clock-history"></i></span>
+            <strong>暂无执行历史</strong>
+            <p>当前筛选条件下没有执行记录。</p>
+        </div>
         {% endif %}
     </div>
-</div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+{{ render_execution_rail(
+    'history',
+    selected_project_id=selected_project_id,
+    selected_status=selected_status,
+    selected_execution_type=selected_execution_type,
+    avg_duration=avg_duration,
+    recent_total=recent_total,
+    show_report_link=has_permission('report:view')
+) }}
 {% endblock %}

@@ -1,127 +1,341 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}场景执行详情{% endblock %}
 {% block page_title %}场景执行详情 #{{ execution.id }}{% endblock %}
 {% block page_desc %}查看每一步的请求、响应、断言与变量传递{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
-{% block content %}
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted">执行状态</div>
-                <div class="fs-4">
-                    {% if execution.status == 'passed' %}
-                    <span class="text-success">成功</span>
-                    {% elif execution.status == 'partial_success' %}
-                    <span class="text-warning">部分成功</span>
-                    {% elif execution.status == 'failed' %}
-                    <span class="text-danger">失败</span>
-                    {% else %}
-                    <span class="text-secondary">{{ execution.status }}</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted">总步骤数</div>
-                <div class="fs-4">{{ execution.total_steps }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted">通过 / 失败</div>
-                <div class="fs-4">{{ execution.passed_steps }} / {{ execution.failed_steps }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body">
-                <div class="text-muted">总耗时</div>
-                <div class="fs-4">{{ execution.duration_ms }} ms</div>
-            </div>
-        </div>
-    </div>
-</div>
+{% set workspace_page_class = 'scenario-detail-page' %}
+{% set detail_total = execution.details | length %}
+{% set detail_passed = execution.passed_steps if execution.passed_steps is not none else 0 %}
+{% set detail_failed = execution.failed_steps if execution.failed_steps is not none else 0 %}
+{% if execution.status == 'passed' %}
+    {% set status_label = '成功' %}
+    {% set status_class = 'status-active' %}
+    {% set status_icon = 'bi-check2-circle' %}
+{% elif execution.status == 'partial_success' %}
+    {% set status_label = '部分成功' %}
+    {% set status_class = 'status-pending' %}
+    {% set status_icon = 'bi-exclamation-triangle' %}
+{% elif execution.status == 'failed' %}
+    {% set status_label = '失败' %}
+    {% set status_class = 'status-muted' %}
+    {% set status_icon = 'bi-x-circle' %}
+{% else %}
+    {% set status_label = execution.status %}
+    {% set status_class = 'status-muted' %}
+    {% set status_icon = 'bi-dot' %}
+{% endif %}
 
-<div class="card mb-4">
-    <div class="card-header bg-white"><strong>执行基本信息</strong></div>
+{% block workspace_heading %}场景执行详情{% endblock %}
+{% block workspace_subtitle %}查看每一步的请求、响应、断言与变量传递{% endblock %}
+
+{% block workspace_back %}
+<a class="btn btn-outline-secondary module-secondary-btn workspace-back-btn" href="{{ url_for('scenario.scenario_execution_history', project_id=execution.scenario.project_id, scenario_id=execution.scenario_id) }}">
+    <i class="bi bi-arrow-left"></i>
+    返回记录
+</a>
+{% endblock %}
+
+{% block workspace_actions %}
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('scenario.scenario_execution_history', project_id=execution.scenario.project_id, scenario_id=execution.scenario_id) }}">
+        <i class="bi bi-clock-history"></i>
+        执行历史
+    </a>
+    {% if has_permission('scenario:run') %}
+    <form method="post" action="{{ url_for('scenario.rerun_scenario_execution', scenario_execution_id=execution.id) }}" class="m-0">
+        <input type="hidden" name="persist_extracted_to_environment" value="0">
+        <button class="btn btn-primary module-primary-btn" type="submit">
+            <i class="bi bi-play-fill"></i>
+            重新执行
+        </button>
+    </form>
+    {% endif %}
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi {{ status_icon }}"></i></span>
+        <div class="module-metric-copy">
+            <small>执行状态</small>
+            <strong>{{ status_label }}</strong>
+            <span>场景 {{ execution.scenario.name }}</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-list-check"></i></span>
+        <div class="module-metric-copy">
+            <small>总步骤数</small>
+            <strong>{{ detail_total }}</strong>
+            <span>本次执行的有效步骤</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-check2"></i></span>
+        <div class="module-metric-copy">
+            <small>通过 / 失败</small>
+            <strong>{{ detail_passed }} / {{ detail_failed }}</strong>
+            <span>步骤级结果统计</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-stopwatch"></i></span>
+        <div class="module-metric-copy">
+            <small>总耗时</small>
+            <strong>{{ execution.duration_ms }} ms</strong>
+            <span>执行时间 {{ (execution.started_at or execution.created_at) | bjt }}</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 复盘辅助</span>
+            <small>执行分析</small>
+        </div>
+        <p>自动梳理每一步的请求与断言，帮助快速定位失败节点。</p>
+    </div>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('scenario.scenario_execution_history', project_id=execution.scenario.project_id, scenario_id=execution.scenario_id) }}">
+        查看更多
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card module-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>执行概览</strong>
+            <small>场景 {{ execution.scenario.name }} · 项目 {{ execution.scenario.project.name }}</small>
+        </div>
+        <div class="module-list-tools">
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('scenario.edit_scenario_page', scenario_id=execution.scenario_id) }}"><i class="bi bi-gear"></i>编辑场景</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('scenario.scenario_execution_history', project_id=execution.scenario.project_id, scenario_id=execution.scenario_id) }}"><i class="bi bi-clock-history"></i>执行历史</a>
+        </div>
+    </div>
     <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-3"><strong>场景：</strong>{{ execution.scenario.name }}</div>
-            <div class="col-md-3"><strong>项目：</strong>{{ execution.scenario.project.name }}</div>
-            <div class="col-md-3"><strong>环境：</strong>{{ execution.environment.name if execution.environment else '-' }}</div>
-            <div class="col-md-3"><strong>执行时间：</strong>{{ (execution.started_at or execution.created_at) | bjt }}</div>
+        <div class="scenario-detail-grid">
+            <div class="scenario-detail-meta">
+                <div><span>项目</span><strong>{{ execution.scenario.project.name }}</strong></div>
+                <div><span>场景</span><strong>{{ execution.scenario.name }}</strong></div>
+                <div><span>模块</span><strong>{{ execution.scenario.module.name if execution.scenario.module else '-' }}</strong></div>
+                <div><span>环境</span><strong>{{ environment.name if environment else '-' }}</strong></div>
+                <div><span>触发类型</span><strong>{{ execution.trigger_type_label }}</strong></div>
+                <div><span>触发人员</span><strong>{{ execution.trigger_person_name }}</strong></div>
+                <div><span>开始时间</span><strong>{{ (execution.started_at or execution.created_at) | bjt }}</strong></div>
+                <div><span>结束时间</span><strong>{{ execution.finished_at | bjt if execution.finished_at else '-' }}</strong></div>
+                <div><span>状态</span><strong class="scenario-detail-status {{ status_class }}">{{ status_label }}</strong></div>
+            </div>
+            <div class="scenario-detail-notes">
+                <label class="form-label">运行时变量快照</label>
+                <pre class="scenario-code-box">{{ execution.runtime_variables_json }}</pre>
+            </div>
         </div>
     </div>
-</div>
+</section>
+{% endblock %}
 
-<div class="card mb-4">
-    <div class="card-header bg-white"><strong>运行时变量快照</strong></div>
-    <div class="card-body">
-        <div class="result-box">{{ execution.runtime_variables_json }}</div>
+{% block workspace_list %}
+<section class="card module-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>步骤明细</strong>
+            <small>按执行顺序展开每一步的请求与响应</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-chip module-count-chip">共 {{ detail_total }} 步</span>
+        </div>
     </div>
-</div>
-
-<div class="card">
-    <div class="card-header bg-white"><strong>步骤明细</strong></div>
     <div class="card-body">
         {% if execution.details %}
-        {% for detail in execution.details %}
-        <div class="card mb-2 detail-item">
-            <button class="card-header detail-toggle d-flex justify-content-between align-items-center w-100 border-0 bg-white"
+        <div class="scenario-step-list">
+            {% for detail in execution.details %}
+            <article class="scenario-step-card card">
+                <button
+                    class="scenario-step-header"
                     type="button"
                     data-bs-toggle="collapse"
                     data-bs-target="#scenarioDetailCollapse{{ detail.id }}"
                     aria-expanded="{{ 'true' if detail.status != 'passed' else 'false' }}"
                     aria-controls="scenarioDetailCollapse{{ detail.id }}">
-                <span class="fw-semibold">{{ detail.step_name }}</span>
-                <span class="d-flex align-items-center gap-3">
-                    <span class="text-muted">{{ detail.testcase_name or '-' }}</span>
-                    <span class="text-muted">耗时：{{ detail.duration_ms }} ms</span>
-                    {% if detail.status == 'passed' %}
-                    <span class="badge bg-success">通过</span>
-                    {% else %}
-                    <span class="badge bg-danger">失败</span>
-                    {% endif %}
-                </span>
-            </button>
-            <div id="scenarioDetailCollapse{{ detail.id }}" class="collapse {% if detail.status != 'passed' %}show{% endif %}">
-                <div class="card-body">
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-12"><strong>错误信息：</strong>{{ detail.error_message or '-' }}</div>
+                    <div class="scenario-step-headline">
+                        <strong>{{ detail.step_name }}</strong>
+                        <small>{{ detail.testcase_name or '-' }}</small>
                     </div>
-                    <div class="split-pane">
-                        <div>
-                            <label class="form-label">请求快照</label>
-                            <div class="result-box">{{ detail.request_snapshot_json }}</div>
+                    <div class="scenario-step-meta">
+                        <span class="module-chip module-count-chip">{{ detail.duration_ms }} ms</span>
+                        {% if detail.status == 'passed' %}
+                        <span class="module-status-chip status-active"><i class="bi bi-dot"></i>通过</span>
+                        {% else %}
+                        <span class="module-status-chip status-muted"><i class="bi bi-dot"></i>失败</span>
+                        {% endif %}
+                    </div>
+                </button>
+                <div id="scenarioDetailCollapse{{ detail.id }}" class="collapse {% if detail.status != 'passed' %}show{% endif %}">
+                    <div class="card-body">
+                        <div class="scenario-step-error">
+                            <span>错误信息</span>
+                            <strong>{{ detail.error_message or '-' }}</strong>
                         </div>
-                        <div>
-                            <label class="form-label">响应快照</label>
-                            <div class="result-box">{{ detail.response_snapshot_json }}</div>
-                        </div>
-                        <div>
-                            <label class="form-label">断言结果</label>
-                            <div class="result-box">{{ detail.assertion_results_json }}</div>
-                        </div>
-                        <div>
-                            <label class="form-label">提取变量</label>
-                            <div class="result-box">{{ detail.extract_snapshot_json }}</div>
+                        <div class="scenario-snapshot-grid">
+                            <div>
+                                <label class="form-label">请求快照</label>
+                                <pre class="scenario-code-box">{{ detail.request_snapshot_json }}</pre>
+                            </div>
+                            <div>
+                                <label class="form-label">响应快照</label>
+                                <pre class="scenario-code-box">{{ detail.response_snapshot_json }}</pre>
+                            </div>
+                            <div>
+                                <label class="form-label">断言结果</label>
+                                <pre class="scenario-code-box">{{ detail.assertion_results_json }}</pre>
+                            </div>
+                            <div>
+                                <label class="form-label">提取变量</label>
+                                <pre class="scenario-code-box">{{ detail.extract_snapshot_json }}</pre>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </article>
+            {% endfor %}
         </div>
-        {% endfor %}
         {% else %}
-        <div class="empty-box">当前场景执行暂无步骤明细</div>
+        <div class="module-empty-state">
+            <span><i class="bi bi-file-earmark-text"></i></span>
+            <strong>当前场景执行暂无步骤明细</strong>
+            <p>执行完成后，这里会展示每一步的请求、响应和变量传递信息。</p>
+        </div>
         {% endif %}
     </div>
-</div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>执行上下文</strong>
+        <a href="{{ url_for('scenario.scenario_execution_history', project_id=execution.scenario.project_id, scenario_id=execution.scenario_id) }}">查看历史</a>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-activity-list">
+            <div class="module-activity-item">
+                <span class="module-activity-icon icon-0"><i class="bi bi-folder2"></i></span>
+                <div class="module-activity-copy">
+                    <strong>{{ execution.scenario.project.name }}</strong>
+                    <small>项目</small>
+                </div>
+            </div>
+            <div class="module-activity-item">
+                <span class="module-activity-icon icon-1"><i class="bi bi-diagram-3"></i></span>
+                <div class="module-activity-copy">
+                    <strong>{{ execution.scenario.name }}</strong>
+                    <small>场景</small>
+                </div>
+            </div>
+            <div class="module-activity-item">
+                <span class="module-activity-icon icon-2"><i class="bi bi-hdd-network"></i></span>
+                <div class="module-activity-copy">
+                    <strong>{{ environment.name if environment else '-' }}</strong>
+                    <small>环境</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            <a class="module-quick-item" href="{{ url_for('scenario.edit_scenario_page', scenario_id=execution.scenario_id) }}">
+                <i class="bi bi-gear"></i>
+                <span>场景编辑</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('scenario.scenario_execution_history', project_id=execution.scenario.project_id, scenario_id=execution.scenario_id) }}">
+                <i class="bi bi-clock-history"></i>
+                <span>执行历史</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('environment.list_environments') }}">
+                <i class="bi bi-hdd-network"></i>
+                <span>环境管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('module.list_modules') }}">
+                <i class="bi bi-box"></i>
+                <span>模块管理</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>最近执行</strong>
+        <button class="module-side-refresh" type="button">刷新</button>
+    </div>
+    <div class="card-body module-side-body">
+        {% if recent_executions %}
+        <div class="module-insight-list">
+            {% for item in recent_executions %}
+            <a class="module-insight-item" href="{{ url_for('scenario.scenario_execution_detail', scenario_execution_id=item.id) }}">
+                <span class="module-insight-icon icon-{{ loop.index0 % 4 }}"><i class="bi bi-play-circle"></i></span>
+                <div>
+                    <strong>{{ item.status }} · {{ item.duration_ms }} ms</strong>
+                    <small>{{ (item.started_at or item.created_at) | bjt }}</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="module-rail-empty">暂无最近执行</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+        <button class="module-side-refresh" type="button">换一换</button>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="{{ url_for('scenario.edit_scenario_page', scenario_id=execution.scenario_id) }}">
+                <span class="module-insight-icon icon-0"><i class="bi bi-list-check"></i></span>
+                <div>
+                    <strong>检查失败步骤的断言和变量</strong>
+                    <small>快速定位问题并补全场景</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('scenario.scenario_execution_history', project_id=execution.scenario.project_id, scenario_id=execution.scenario_id) }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-clock-history"></i></span>
+                <div>
+                    <strong>对比最近多次执行结果</strong>
+                    <small>分析稳定性与波动趋势</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
 {% endblock %}

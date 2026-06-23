@@ -1,74 +1,132 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}UI 报告回放{% endblock %}
 {% block page_title %}UI 报告回放{% endblock %}
-{% block page_desc %}查看 UI 自动化执行结果、日志、截图、Trace 和视频，快速定位失败原因。{% endblock %}
+{% block page_desc %}查看自动化执行结果、日志、截图、Trace 和视频，快速定位失败原因。{% endblock %}
 
-{% block content %}
-<div class="page-action-panel mb-4 p-4" id="uiReplayPage">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
+
+{% set workspace_page_class = 'ui-automation-replays-page' %}
+{% set workspace_layout_class = 'ui-automation-replays-layout' %}
+{% set workspace_rail_class = 'ui-automation-replays-rail' %}
+{% set selected_project_name = selected_project.name if selected_project else ('全部项目' if selected_project_id else '当前项目') %}
+{% set artifact_total = stats.artifacts %}
+
+{% block workspace_heading %}UI 报告回放{% endblock %}
+{% block workspace_subtitle %}查看自动化执行结果、日志、截图、Trace 和视频，快速定位失败原因。{% endblock %}
+
+{% block workspace_actions %}
+<a href="{{ url_for('ui_auto.index') }}" class="btn btn-primary module-primary-btn">
+    <i class="bi bi-arrow-left"></i>
+    返回总览
+</a>
+<a href="{{ url_for('ui_auto.executions_page') }}" class="btn btn-outline-primary module-secondary-btn">
+    <i class="bi bi-clock-history"></i>
+    执行计划
+</a>
+<a href="{{ url_for('ui_auto.scripts_page') }}" class="btn btn-outline-primary module-secondary-btn">
+    <i class="bi bi-file-earmark-code"></i>
+    脚本管理
+</a>
+<a href="{{ url_for('execution.history_page') }}" class="btn btn-outline-primary module-secondary-btn">
+    <i class="bi bi-bar-chart"></i>
+    执行历史
+</a>
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-file-earmark-text"></i></span>
+        <div class="module-metric-copy">
+            <small>回放总数</small>
+            <strong>{{ stats.total }}</strong>
+            <span>当前项目可见的 UI 自动化执行记录</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-check2-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>成功回放</small>
+            <strong>{{ stats.passed }}</strong>
+            <span>执行成功且保留完整产物的记录</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-x-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>失败回放</small>
+            <strong>{{ stats.failed }}</strong>
+            <span>可直接进入详情查看日志和截图</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-archive"></i></span>
+        <div class="module-metric-copy">
+            <small>产物总数</small>
+            <strong>{{ artifact_total }}</strong>
+            <span>日志、截图、视频、Trace 等文件</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner replay-workbench-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>UI Automation Replay</span>
+            <small>快速回放</small>
+        </div>
+        <p>把每次 UI 自动化执行的结果、产物和关键日志聚到一个页面里，方便快速回看和定位问题。</p>
+        <div class="execution-banner-meta">
+            <span class="module-side-badge">项目：{{ selected_project_name }}</span>
+            <span class="module-side-badge">状态：{{ selected_status or '全部' }}</span>
+            <span class="module-side-badge">浏览器：{{ selected_browser_type or '全部' }}</span>
+        </div>
+    </div>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-play-circle"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('execution.history_page') }}">
+        执行历史
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card module-filter-card replay-filter-card" id="uiReplayPage">
+    <div class="card-header module-list-header">
         <div>
-            <div class="text-uppercase text-muted small fw-semibold mb-2">UI Automation Replay</div>
-            <h4 class="mb-2">报告回放</h4>
-            <p class="text-muted mb-0">把每次 UI 自动化执行的结果、产物和关键日志集中到一个页面里，方便快速回看和定位问题。</p>
+            <strong>筛选条件</strong>
+            <small class="text-muted ms-2">按脚本、状态、浏览器快速找到想看的回放</small>
         </div>
-        <div class="d-flex flex-wrap gap-2">
-            <a href="{{ url_for('ui_auto.index') }}" class="btn btn-outline-secondary btn-sm">返回总览</a>
-            <a href="{{ url_for('execution.history_page') }}" class="btn btn-outline-primary btn-sm">执行历史</a>
-        </div>
-    </div>
-</div>
-
-<div class="row g-3 mb-4">
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">回放总数</div>
-            <div class="stat-value">{{ stats.total }}</div>
-            <div class="text-muted small mt-2">当前项目可见的 UI 自动化执行记录</div>
+        <div class="module-list-tools">
+            <span class="module-side-badge">当前结果 {{ runs|length }} 条</span>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('ui_auto.replays_page') }}">重置</a>
         </div>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">成功回放</div>
-            <div class="stat-value text-success">{{ stats.passed }}</div>
-            <div class="text-muted small mt-2">执行成功并留下完整产物的记录</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">失败回放</div>
-            <div class="stat-value text-danger">{{ stats.failed }}</div>
-            <div class="text-muted small mt-2">可直接进入详情查看日志和截图</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="stat-card h-100">
-            <div class="stat-label">产物总数</div>
-            <div class="stat-value">{{ stats.artifacts }}</div>
-            <div class="text-muted small mt-2">日志、截图、视频、Trace 等文件</div>
-        </div>
-    </div>
-</div>
-
-<div class="data-card mb-4">
-    <div class="data-card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <div>
-            <h5 class="mb-1">筛选条件</h5>
-            <p class="text-muted mb-0">按脚本、状态、浏览器快速找到想看的回放。</p>
-        </div>
-        <div class="text-muted small">支持关键字、状态和浏览器类型筛选</div>
-    </div>
-    <div class="p-4">
-        <form id="replayFilterForm" method="get" action="{{ url_for('ui_auto.replays_page') }}">
+    <div class="card-body module-filter-body">
+        <form id="replayFilterForm" method="get" action="{{ url_for('ui_auto.replays_page') }}" class="replay-filter-form">
             {% if selected_project_id %}
             <input type="hidden" name="project_id" value="{{ selected_project_id }}">
             {% endif %}
             <div class="row g-3 align-items-end">
-                <div class="col-lg-4">
+                <div class="col-lg-5 col-md-12">
                     <label class="form-label">关键词</label>
-                    <input class="form-control" name="keyword" value="{{ keyword }}" placeholder="脚本名称、编码、环境、错误信息">
+                    <input class="form-control" name="keyword" value="{{ keyword }}" placeholder="脚本名称、编号、环境、错误信息">
                 </div>
-                <div class="col-lg-2 col-md-4">
+                <div class="col-lg-3 col-md-6">
                     <label class="form-label">状态</label>
                     <select class="form-select" name="status">
                         <option value="">全部状态</option>
@@ -79,7 +137,7 @@
                         <option value="timeout" {% if selected_status == 'timeout' %}selected{% endif %}>超时</option>
                     </select>
                 </div>
-                <div class="col-lg-2 col-md-4">
+                <div class="col-lg-3 col-md-6">
                     <label class="form-label">浏览器</label>
                     <select class="form-select" name="browser_type">
                         <option value="">全部浏览器</option>
@@ -89,45 +147,52 @@
                         <option value="webkit" {% if selected_browser_type == 'webkit' %}selected{% endif %}>WebKit</option>
                     </select>
                 </div>
-                <div class="col-lg-4 col-md-4 d-flex gap-2">
-                    <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
-                    <a class="btn btn-outline-secondary" href="{{ url_for('ui_auto.replays_page') }}" title="重置"><i class="bi bi-eraser"></i></a>
+                <div class="col-lg-auto col-md-12 replay-filter-actions">
+                    <button class="btn btn-primary" type="submit">查询</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('ui_auto.replays_page') }}" title="重置">
+                        <i class="bi bi-eraser"></i>
+                    </a>
                 </div>
             </div>
         </form>
-    </div>
-</div>
-
-{% if active_filters %}
-<div class="mb-4 px-1">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <span class="text-muted small fw-semibold">当前筛选</span>
-        {% for item in active_filters %}
-        <span class="badge text-bg-light border">{{ item }}</span>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
-
-<div class="data-card">
-    <div class="data-card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <div>
-            <h5 class="mb-1">回放列表</h5>
-            <p class="text-muted mb-0">点击详情即可查看日志、截图、Trace 和视频产物。</p>
+        {% if active_filters %}
+        <div class="replay-active-filters">
+            <span class="text-muted small fw-semibold">当前筛选</span>
+            <div class="d-flex flex-wrap gap-2">
+                {% for item in active_filters %}
+                <span class="badge text-bg-light border">{{ item }}</span>
+                {% endfor %}
+            </div>
         </div>
-        <div class="text-muted small">当前筛选结果 {{ runs|length }} 条</div>
+        {% endif %}
     </div>
-    <div class="p-0">
+</section>
+{% endblock %}
+
+{% block workspace_list %}
+<section class="card module-list-card replay-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>回放列表</strong>
+            <small class="text-muted ms-2">点击详情即可查看日志、截图、Trace 和视频产物</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-side-badge">当前筛选结果 {{ runs|length }} 条</span>
+            <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('execution.history_page') }}">执行历史</a>
+        </div>
+    </div>
+    <div class="card-body p-0">
         {% if runs %}
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+        <div class="table-responsive replay-table-wrap">
+            <table class="table table-hover align-middle mb-0 replay-table">
                 <thead class="table-light">
                     <tr>
                         <th style="width: 10%;">状态</th>
                         <th style="width: 22%;">脚本</th>
                         <th style="width: 20%;">环境</th>
                         <th style="width: 10%;">浏览器</th>
-                        <th style="width: 10%;">模式</th>
+                        <th style="width: 10%;">触发类型</th>
+                        <th style="width: 10%;">触发人员</th>
                         <th style="width: 10%;">产物</th>
                         <th style="width: 12%;">时间</th>
                         <th style="width: 16%;">操作</th>
@@ -146,32 +211,53 @@
                             <span class="badge bg-dark">超时</span>
                             {% elif run.status == 'running' %}
                             <span class="badge bg-primary">执行中</span>
-                            {% else %}
+                            {% elif run.status == 'queued' %}
                             <span class="badge bg-warning text-dark">排队中</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ run.status }}</span>
                             {% endif %}
-                            <div class="small text-muted mt-1">#{{ run.id }}</div>
+                            <div class="text-muted small mt-1">#{{ run.id }}</div>
                         </td>
                         <td>
-                            <div class="fw-semibold">{{ row.script_name or '-' }}</div>
-                            <small class="text-muted">{{ row.script_code or '-' }}{% if row.version_no %} · v{{ row.version_no }}{% endif %}</small>
+                            <div class="fw-semibold text-truncate" title="{{ row.script_name }}">{{ row.script_name or '-' }}</div>
+                            <small class="text-muted">{{ row.script_code or '-' }}</small>
                         </td>
                         <td>
-                            <div class="fw-semibold">{{ row.environment_name or '-' }}</div>
-                            <small class="text-muted text-truncate d-block" style="max-width: 280px;">{{ row.environment_base_url or '' }}</small>
+                            <div class="fw-semibold text-truncate" title="{{ row.environment_name }}">{{ row.environment_name or '-' }}</div>
+                            <small class="text-muted text-truncate d-block" title="{{ row.environment_base_url }}">{{ row.environment_base_url or '-' }}</small>
                         </td>
                         <td>{{ run.browser_type }}</td>
-                        <td>{{ run.run_mode }}</td>
+                        <td>{{ run.trigger_type_label }}</td>
+                        <td>{{ run.trigger_person_name }}</td>
                         <td>
-                            <div class="fw-semibold">{{ row.artifact_count }} 个</div>
+                            <div class="fw-semibold">{{ row.artifact_count }}</div>
                             <small class="text-muted">{{ row.screenshot_count }} 图 / {{ row.trace_count }} Trace / {{ row.video_count }} 视频</small>
                         </td>
                         <td>{{ run.created_at|bjt }}</td>
                         <td>
-                            <div class="d-flex flex-wrap gap-2">
-                                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('ui_auto.replay_detail_page', run_id=run.id) }}">查看详情</a>
-                                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('ui_auto.executions_page', project_id=selected_project_id) if selected_project_id else url_for('ui_auto.executions_page') }}">执行列表</a>
+                            <div class="d-flex flex-nowrap gap-2 replay-row-actions">
+                                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('ui_auto.replay_detail_page', run_id=run.id) }}">
+                                    查看详情
+                                </a>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                        执行列表
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        {% if row.log_artifact %}
+                                        <li>
+                                            <a class="dropdown-item" href="{{ url_for('ui_auto.preview_replay_artifact', run_id=run.id, artifact_id=row.log_artifact.id) }}">日志预览</a>
+                                        </li>
+                                        {% endif %}
+                                        <li>
+                                            <a class="dropdown-item" href="{{ url_for('ui_auto.replay_detail_page', run_id=run.id) }}#replay-artifacts">查看产物</a>
+                                        </li>
+                                    </ul>
+                                </div>
                                 {% if row.log_artifact %}
-                                <a class="btn btn-sm btn-outline-success" href="{{ url_for('ui_auto.download_artifact', run_id=run.id, artifact_id=row.log_artifact.id) }}">日志</a>
+                                <a class="btn btn-sm btn-outline-success" href="{{ url_for('ui_auto.preview_replay_artifact', run_id=run.id, artifact_id=row.log_artifact.id) }}">
+                                    日志
+                                </a>
                                 {% endif %}
                             </div>
                         </td>
@@ -181,8 +267,94 @@
             </table>
         </div>
         {% else %}
-        <div class="empty-box m-3">当前没有可回放的 UI 自动化记录，先执行一次脚本即可看到这里的内容。</div>
+        <div class="empty-box m-3">暂无回放记录，先到执行计划里提交一条 UI 自动化任务。</div>
         {% endif %}
     </div>
-</div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>回放概览</strong>
+        <a href="{{ url_for('execution.history_page') }}">查看执行</a>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-0"><i class="bi bi-file-earmark-text"></i></span>
+                <div>
+                    <strong>总回放</strong>
+                    <small>{{ stats.total }}</small>
+                </div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-1"><i class="bi bi-check2-circle"></i></span>
+                <div>
+                    <strong>成功</strong>
+                    <small>{{ stats.passed }}</small>
+                </div>
+            </div>
+            <div class="module-insight-item">
+                <span class="module-insight-icon icon-2"><i class="bi bi-x-circle"></i></span>
+                <div>
+                    <strong>失败</strong>
+                    <small>{{ stats.failed }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            <a class="module-quick-item" href="{{ url_for('ui_auto.scripts_page') }}">
+                <i class="bi bi-file-earmark-code"></i>
+                <span>脚本管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.locators_page') }}">
+                <i class="bi bi-crosshair"></i>
+                <span>定位器库</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.executions_page') }}">
+                <i class="bi bi-clock-history"></i>
+                <span>执行计划</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('ui_auto.index') }}">
+                <i class="bi bi-grid-1x2"></i>
+                <span>自动化总览</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="{{ url_for('ui_auto.replay_detail_page', run_id=runs[0].run.id) if runs else url_for('ui_auto.executions_page') }}">
+                <span class="module-insight-icon icon-0"><i class="bi bi-activity"></i></span>
+                <div>
+                    <strong>优先查看最新失败</strong>
+                    <small>先定位异常，再看日志与截图。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('ui_auto.index') }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-stars"></i></span>
+                <div>
+                    <strong>关联脚本与定位器</strong>
+                    <small>把回放问题反向补回脚本与定位器。</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
 {% endblock %}

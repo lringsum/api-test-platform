@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
@@ -25,6 +27,7 @@ def list_projects():
         projects=projects,
         keyword=keyword,
         selected_status=status,
+        recent_cutoff=datetime.utcnow() - timedelta(days=7),
     )
 
 

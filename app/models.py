@@ -35,6 +35,21 @@ class JsonTextMixin:
             return default
 
 
+class TriggerInfoMixin:
+    @property
+    def trigger_type_label(self):
+        return "自动触发" if self.trigger_type == "automatic" else "手动触发"
+
+    @property
+    def trigger_person_name(self):
+        user = getattr(self, "trigger_user", None)
+        if user:
+            return user.display_name or user.username
+        if self.trigger_type == "automatic":
+            return "系统"
+        return "-"
+
+
 user_roles = db.Table(
     "user_roles",
     db.Column("user_id", db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
@@ -594,7 +609,7 @@ class UiAutomationLocator(db.Model, TimestampMixin):
         return f"<UiAutomationLocator {self.locator_code}>"
 
 
-class UiAutomationRun(db.Model, TimestampMixin, JsonTextMixin):
+class UiAutomationRun(db.Model, TimestampMixin, JsonTextMixin, TriggerInfoMixin):
     __tablename__ = "ui_automation_runs"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -620,6 +635,7 @@ class UiAutomationRun(db.Model, TimestampMixin, JsonTextMixin):
     )
     browser_type = db.Column(db.String(20), default="chromium", nullable=False)
     run_mode = db.Column(db.String(20), default="manual", nullable=False)
+    trigger_type = db.Column(db.String(20), default="manual", nullable=False)
     status = db.Column(db.String(20), default="queued", nullable=False)
     retry_count = db.Column(db.Integer, default=0, nullable=False)
     max_retry = db.Column(db.Integer, default=0, nullable=False)
@@ -756,7 +772,7 @@ class UiAutomationAIRecord(db.Model, TimestampMixin, JsonTextMixin):
         return f"<UiAutomationAIRecord {self.record_type}>"
 
 
-class Execution(db.Model, TimestampMixin, JsonTextMixin):
+class Execution(db.Model, TimestampMixin, JsonTextMixin, TriggerInfoMixin):
     __tablename__ = "executions"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -773,6 +789,12 @@ class Execution(db.Model, TimestampMixin, JsonTextMixin):
     execution_type = db.Column(db.String(20), nullable=False)
     target_type = db.Column(db.String(20), nullable=False)
     target_id = db.Column(db.Integer, nullable=False)
+    trigger_type = db.Column(db.String(20), default="manual", nullable=False)
+    trigger_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     status = db.Column(db.String(20), default="pending", nullable=False)
     total_count = db.Column(db.Integer, default=0, nullable=False)
     passed_count = db.Column(db.Integer, default=0, nullable=False)
@@ -782,6 +804,8 @@ class Execution(db.Model, TimestampMixin, JsonTextMixin):
     summary_json = db.Column(db.Text, default="{}", nullable=False)
     started_at = db.Column(db.DateTime, nullable=True)
     finished_at = db.Column(db.DateTime, nullable=True)
+
+    trigger_user = db.relationship("User", foreign_keys=[trigger_user_id], lazy=True)
 
     details = db.relationship(
         "ExecutionDetail",
@@ -1009,7 +1033,7 @@ class ScenarioStep(db.Model, TimestampMixin, JsonTextMixin):
         return f"<ScenarioStep {self.order_no}:{self.name or self.testcase_id}>"
 
 
-class ScenarioExecution(db.Model, TimestampMixin, JsonTextMixin):
+class ScenarioExecution(db.Model, TimestampMixin, JsonTextMixin, TriggerInfoMixin):
     __tablename__ = "scenario_executions"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -1024,6 +1048,12 @@ class ScenarioExecution(db.Model, TimestampMixin, JsonTextMixin):
         nullable=True,
     )
     trigger_mode = db.Column(db.String(20), default="manual", nullable=False)
+    trigger_type = db.Column(db.String(20), default="manual", nullable=False)
+    trigger_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     status = db.Column(db.String(20), default="pending", nullable=False)
     total_steps = db.Column(db.Integer, default=0, nullable=False)
     passed_steps = db.Column(db.Integer, default=0, nullable=False)
@@ -1032,6 +1062,8 @@ class ScenarioExecution(db.Model, TimestampMixin, JsonTextMixin):
     runtime_variables_json = db.Column(db.Text, default="{}", nullable=False)
     started_at = db.Column(db.DateTime, nullable=True)
     finished_at = db.Column(db.DateTime, nullable=True)
+
+    trigger_user = db.relationship("User", foreign_keys=[trigger_user_id], lazy=True)
 
     details = db.relationship(
         "ScenarioExecutionDetail",

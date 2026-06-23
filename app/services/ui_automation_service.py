@@ -15,6 +15,7 @@ from app.models import (
     UiAutomationScriptVersion,
 )
 from app.services.base_service import ServiceError, commit_session, ensure_not_blank
+from app.utils.trigger import normalize_trigger_type
 
 
 DEFAULT_SCRIPT_TEMPLATE = """from playwright.sync_api import expect
@@ -782,6 +783,7 @@ class UiAutomationService:
         environment_id=None,
         browser_type="chromium",
         run_mode="manual",
+        trigger_type="automatic",
         max_retry=0,
         trigger_source="ui",
         trigger_user_id=None,
@@ -829,11 +831,14 @@ class UiAutomationService:
             environment_id=environment.id if environment else None,
             browser_type=str(browser_type or "chromium").strip().lower(),
             run_mode=str(run_mode or "manual").strip().lower(),
+            trigger_type=normalize_trigger_type(trigger_type),
             status="queued",
             max_retry=int(max_retry or 0),
             trigger_user_id=trigger_user_id,
             trigger_source=str(trigger_source or "ui").strip().lower(),
         )
+        db.session.add(run)
+        db.session.flush()
         run.summary = {
             "script_name": script.name,
             "script_code": script.code,
@@ -842,7 +847,8 @@ class UiAutomationService:
             "environment_base_url": environment.base_url if environment else "",
             "browser_type": run.browser_type,
             "run_mode": run.run_mode,
+            "trigger_type": run.trigger_type,
+            "trigger_person": run.trigger_person_name,
         }
-        db.session.add(run)
         commit_session()
         return run

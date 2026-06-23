@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import Blueprint, render_template, request
 
 from app.routes import handle_page_error, handle_success
@@ -13,14 +15,32 @@ environment_bp = Blueprint("environment", __name__, url_prefix="/environments")
 @environment_bp.route("/")
 @require_permission("environment:view")
 def list_environments():
-    project_id = resolve_project_id()
+    project_id = request.args.get("project_id", type=int) or resolve_project_id()
+    keyword = (request.args.get("keyword") or "").strip()
+    status = (request.args.get("status") or "").strip()
     environments = EnvironmentService.list_all(project_id=project_id)
+    if keyword:
+        lowered = keyword.lower()
+        environments = [
+            item
+            for item in environments
+            if lowered in item.name.lower()
+            or lowered in item.base_url.lower()
+            or lowered in (item.description or "").lower()
+        ]
+    if status == "active":
+        environments = [item for item in environments if item.is_active]
+    elif status == "inactive":
+        environments = [item for item in environments if not item.is_active]
     projects = accessible_projects()
     return render_template(
         "environments/list.html",
         environments=environments,
         projects=projects,
         selected_project_id=project_id,
+        keyword=keyword,
+        selected_status=status,
+        recent_cutoff=datetime.utcnow() - timedelta(days=7),
     )
 
 

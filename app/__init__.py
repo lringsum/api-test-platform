@@ -55,6 +55,8 @@ def register_blueprints(app):
 def create_app():
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     instance_path = os.path.join(project_root, "instance")
+    # Runtime static assets are served from project_root/public.
+    # app/static is reserved for non-runtime fixtures and deprecated placeholders.
     app = Flask(
         __name__,
         instance_path=instance_path,
@@ -84,6 +86,65 @@ def create_app():
                 )
             )
             db.session.commit()
+
+        execution_columns = {
+            column["name"] for column in inspector.get_columns("executions")
+        }
+        if "trigger_type" not in execution_columns:
+            db.session.execute(
+                text(
+                    "ALTER TABLE executions "
+                    "ADD COLUMN trigger_type TEXT NOT NULL DEFAULT 'manual'"
+                )
+            )
+        if "trigger_user_id" not in execution_columns:
+            db.session.execute(
+                text("ALTER TABLE executions ADD COLUMN trigger_user_id INTEGER")
+            )
+
+        scenario_execution_columns = {
+            column["name"] for column in inspector.get_columns("scenario_executions")
+        }
+        if "trigger_type" not in scenario_execution_columns:
+            db.session.execute(
+                text(
+                    "ALTER TABLE scenario_executions "
+                    "ADD COLUMN trigger_type TEXT NOT NULL DEFAULT 'manual'"
+                )
+            )
+            db.session.execute(
+                text(
+                    "UPDATE scenario_executions SET trigger_type = "
+                    "CASE WHEN lower(trigger_mode) = 'manual' "
+                    "THEN 'manual' ELSE 'automatic' END"
+                )
+            )
+        if "trigger_user_id" not in scenario_execution_columns:
+            db.session.execute(
+                text(
+                    "ALTER TABLE scenario_executions "
+                    "ADD COLUMN trigger_user_id INTEGER"
+                )
+            )
+
+        ui_run_columns = {
+            column["name"] for column in inspector.get_columns("ui_automation_runs")
+        }
+        if "trigger_type" not in ui_run_columns:
+            db.session.execute(
+                text(
+                    "ALTER TABLE ui_automation_runs "
+                    "ADD COLUMN trigger_type TEXT NOT NULL DEFAULT 'manual'"
+                )
+            )
+            db.session.execute(
+                text(
+                    "UPDATE ui_automation_runs SET trigger_type = "
+                    "CASE WHEN lower(run_mode) = 'manual' "
+                    "THEN 'manual' ELSE 'automatic' END"
+                )
+            )
+        db.session.commit()
         SecurityService.ensure_default_data()
 
     @app.template_filter("bjt")

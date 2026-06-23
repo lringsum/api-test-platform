@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}环境管理{% endblock %}
 {% block page_title %}环境管理{% endblock %}
@@ -6,94 +6,208 @@
 {% block topbar_class %}topbar-without-page{% endblock %}
 {% block topbar_page %}{% endblock %}
 
-{% block content %}
-<div class="api-workspace-page">
-<div class="api-workspace-header">
-    <div><span class="page-eyebrow">RUNTIME CONFIGURATION</span><h2>环境管理</h2><p>统一维护 Base URL、请求头和运行变量，保障执行配置稳定一致。</p></div>
-    {% if has_permission('environment:create') %}
-    <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#createEnvironmentPanel"><i class="bi bi-plus-lg"></i>新增环境</button>
+{% set workspace_page_class = 'environment-workspace-page' %}
+{% set environments_total = environments | length %}
+{% set env_stats = namespace(active=0, inactive=0, recent=0, variable_total=0) %}
+{% for item in environments %}
+    {% set env_stats.variable_total = env_stats.variable_total + (item.variables | length) %}
+    {% if item.is_active %}
+        {% set env_stats.active = env_stats.active + 1 %}
+    {% else %}
+        {% set env_stats.inactive = env_stats.inactive + 1 %}
     {% endif %}
-</div>
-{% if has_permission('environment:create') %}
-<div class="card mb-3 page-action-panel api-create-panel">
-    <div class="collapse" id="createEnvironmentPanel">
-        <div class="card-body page-action-panel-body">
-            <form method="post" action="{{ url_for('environment.create_environment') }}">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">所属项目</label>
-                        <select class="form-select" name="project_id">
-                            {% for project in projects %}
-                            <option value="{{ project.id }}">{{ project.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">环境名称</label>
-                        <input class="form-control" name="name" placeholder="例如：测试环境">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Base URL</label>
-                        <input class="form-control" name="base_url" placeholder="例如：http://127.0.0.1:5001">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">默认请求头 JSON</label>
-                        <textarea class="form-control json-textarea" name="headers_json">{}</textarea>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">默认变量 JSON</label>
-                        <textarea class="form-control json-textarea" name="variables_json">{}</textarea>
-                    </div>
-                    <div class="col-md-10">
-                        <label class="form-label">描述</label>
-                        <input class="form-control" name="description" placeholder="请输入环境描述">
-                    </div>
-                    <div class="col-12 d-flex justify-content-end">
-                        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>新增环境</button>
-                    </div>
+    {% if item.updated_at and item.updated_at >= recent_cutoff %}
+        {% set env_stats.recent = env_stats.recent + 1 %}
+    {% endif %}
+{% endfor %}
+
+{% block workspace_heading %}环境管理{% endblock %}
+{% block workspace_subtitle %}统一维护 Base URL、请求头和运行变量，保障执行配置稳定一致{% endblock %}
+
+{% block workspace_actions %}
+    {% if has_permission('environment:create') %}
+    <button class="btn btn-primary module-primary-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#createEnvironmentDrawer">
+        <i class="bi bi-plus-lg"></i>
+        新增环境
+    </button>
+    {% endif %}
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('variable.list_variables') }}">
+        <i class="bi bi-stars"></i>
+        变量管理
+    </a>
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-hdd-network"></i></span>
+        <div class="module-metric-copy">
+            <small>环境总数</small>
+            <strong>{{ environments_total }}</strong>
+            <span>按当前项目范围统计</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-check2-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>启用中</small>
+            <strong>{{ env_stats.active }}</strong>
+            <span>可用于执行与联调</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-slash-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>停用中</small>
+            <strong>{{ env_stats.inactive }}</strong>
+            <span>需要关注或补充配置</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-braces-asterisk"></i></span>
+        <div class="module-metric-copy">
+            <small>变量总数</small>
+            <strong>{{ env_stats.variable_total }}</strong>
+            <span>环境内变量与参数配置</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 智能辅助</span>
+            <small>全新升级</small>
+        </div>
+        <p>快速识别环境配置差异，自动整理请求头与变量模板。</p>
+    </div>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="javascript:void(0)">
+        立即体验
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card module-filter-card">
+    <div class="card-body module-filter-body">
+        <form method="get" action="{{ url_for('environment.list_environments') }}" class="module-filter-form">
+            <div class="module-filter-grid">
+                <div class="module-field">
+                    <label class="form-label">项目</label>
+                    <select class="form-select" name="project_id">
+                        <option value="">全部项目</option>
+                        {% for project in projects %}
+                        <option value="{{ project.id }}" {% if selected_project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-            </form>
+                <div class="module-field">
+                    <label class="form-label">关键词</label>
+                    <input class="form-control" type="text" name="keyword" value="{{ keyword or '' }}" placeholder="搜索名称、Base URL 或描述">
+                </div>
+                <div class="module-field">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="active" {% if selected_status == 'active' %}selected{% endif %}>启用中</option>
+                        <option value="inactive" {% if selected_status == 'inactive' %}selected{% endif %}>已停用</option>
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">更新时间</label>
+                    <select class="form-select" name="recent">
+                        <option value="">全部时间</option>
+                        <option value="7">近 7 天</option>
+                        <option value="30">近 30 天</option>
+                    </select>
+                </div>
+                <div class="module-filter-actions">
+                    <button class="btn btn-primary" type="submit">查询</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('environment.list_environments') }}">重置</a>
+                    <button class="btn btn-link module-expand-link" type="button">展开 <i class="bi bi-chevron-down"></i></button>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_list %}
+<section class="card module-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>环境列表</strong>
+            <small>共 {{ environments_total }} 个环境，按最近更新时间排序</small>
+        </div>
+        <div class="module-list-tools">
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-upload"></i>批量导入</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-download"></i>导出</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button"><i class="bi bi-three-dots"></i>更多操作</button>
         </div>
     </div>
-</div>
-{% endif %}
-
-<div class="card api-list-card">
-    <div class="card-header bg-white"><strong>环境列表</strong></div>
-    <div class="card-body">
+    <div class="card-body module-list-body">
         {% if environments %}
-        <div class="table-responsive">
-            <table class="table table-hover">
+        <div class="table-responsive module-table-wrap">
+            <table class="table align-middle module-table">
                 <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>环境名称</th>
-                    <th>所属项目</th>
-                    <th>Base URL</th>
-                    <th>状态</th>
-                    <th width="280">操作</th>
+                    <th style="width: 72px;">ID</th>
+                    <th style="width: 220px;">环境名称</th>
+                    <th style="width: 180px;">所属项目</th>
+                    <th style="width: 280px;">Base URL</th>
+                    <th style="width: 112px;">状态</th>
+                    <th style="width: 132px;">变量数</th>
+                    <th style="width: 168px;">最近更新时间</th>
+                    <th style="width: 176px;">操作</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for item in environments %}
+                {% if item.is_active %}
+                    {% set status_label = '启用' %}
+                    {% set status_class = 'status-active' %}
+                {% else %}
+                    {% set status_label = '停用' %}
+                    {% set status_class = 'status-muted' %}
+                {% endif %}
                 <tr>
-                    <td>{{ item.id }}</td>
-                    <td>{{ item.name }}</td>
-                    <td>{{ item.project.name }}</td>
-                    <td>{{ item.base_url }}</td>
+                    <td class="module-id-cell">{{ item.id }}</td>
                     <td>
-                        {% if item.is_active %}
-                        <span class="badge bg-success">启用</span>
-                        {% else %}
-                        <span class="badge bg-secondary">停用</span>
-                        {% endif %}
+                        <div class="module-name-cell">
+                            <span class="module-row-icon icon-{{ loop.index0 % 4 }}"><i class="bi bi-hdd-network"></i></span>
+                            <div>
+                                <strong>{{ item.name }}</strong>
+                                <small>ENV-{{ '%03d' | format(item.id) }}</small>
+                            </div>
+                        </div>
                     </td>
+                    <td><span class="module-chip module-project-chip"><i class="bi bi-folder2"></i>{{ item.project.name }}</span></td>
+                    <td class="module-description-cell">{{ item.base_url }}</td>
                     <td>
-                        <div class="d-flex gap-2 mb-2">
+                        <span class="module-status-chip {{ status_class }}">
+                            <i class="bi bi-dot"></i>{{ status_label }}
+                        </span>
+                    </td>
+                    <td><span class="module-chip module-count-chip">{{ item.variables | length }}</span></td>
+                    <td class="module-time-cell">{{ item.updated_at | bjt }}</td>
+                    <td>
+                        <div class="module-row-actions">
                             {% if has_permission('environment:edit') %}
-                            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#editEnv{{ item.id }}">
-                                <i class="bi bi-pencil-square me-1"></i>编辑
-                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#editEnvironmentDrawer{{ item.id }}">编辑</button>
                             {% endif %}
                             {% if has_permission('environment:delete') %}
                             <form method="post" action="{{ url_for('environment.delete_environment', environment_id=item.id) }}" onsubmit="return confirm('确认删除该环境吗？');">
@@ -101,54 +215,214 @@
                             </form>
                             {% endif %}
                         </div>
-                        {% if has_permission('environment:edit') %}
-                        <div class="collapse" id="editEnv{{ item.id }}">
-                            <div class="card card-body bg-light">
-                                <form method="post" action="{{ url_for('environment.edit_environment', environment_id=item.id) }}" class="row g-2">
-                                    <div class="col-md-4">
-                                        <label class="form-label">环境名称</label>
-                                        <input class="form-control form-control-sm" name="name" value="{{ item.name }}">
-                                    </div>
-                                    <div class="col-md-8">
-                                        <label class="form-label">Base URL</label>
-                                        <input class="form-control form-control-sm" name="base_url" value="{{ item.base_url }}">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">默认请求头 JSON</label>
-                                        <textarea class="form-control form-control-sm json-textarea" name="headers_json">{{ item.headers_json }}</textarea>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">默认变量 JSON</label>
-                                        <textarea class="form-control form-control-sm json-textarea" name="variables_json">{{ item.variables_json }}</textarea>
-                                    </div>
-                                    <div class="col-md-8">
-                                        <label class="form-label">描述</label>
-                                        <input class="form-control form-control-sm" name="description" value="{{ item.description }}">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">状态</label>
-                                        <select class="form-select form-select-sm" name="is_active">
-                                            <option value="1" {% if item.is_active %}selected{% endif %}>启用</option>
-                                            <option value="0" {% if not item.is_active %}selected{% endif %}>停用</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-12 d-flex justify-content-end">
-                                        <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check-lg me-1"></i>保存修改</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
+        <div class="module-pagination">
+            <div class="module-pagination-info">共 {{ environments_total }} 条</div>
+            <div class="module-pagination-controls">
+                <button class="btn btn-outline-secondary btn-sm" type="button" disabled><i class="bi bi-chevron-left"></i></button>
+                <button class="btn btn-primary btn-sm" type="button">1</button>
+                <button class="btn btn-outline-secondary btn-sm" type="button" disabled><i class="bi bi-chevron-right"></i></button>
+                <span>前往</span>
+                <input type="text" value="1" aria-label="页码">
+                <span>页</span>
+            </div>
+        </div>
         {% else %}
-        <div class="empty-box">暂无环境数据</div>
+        <div class="module-empty-state">
+            <span><i class="bi bi-hdd-network"></i></span>
+            <strong>当前还没有环境</strong>
+            <p>新建环境后，可以统一维护请求头、变量和执行入口。</p>
+        </div>
         {% endif %}
     </div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>最近动态</strong>
+        <a href="javascript:void(0)">查看全部</a>
+    </div>
+    <div class="card-body module-side-body">
+        {% if environments %}
+        <div class="module-activity-list">
+            {% for item in environments[:4] %}
+            <div class="module-activity-item">
+                <span class="module-activity-icon icon-{{ loop.index0 % 4 }}">
+                    <i class="bi bi-hdd-network"></i>
+                </span>
+                <div class="module-activity-copy">
+                    <strong>{{ item.name }} 有更新</strong>
+                    <small>{{ item.updated_at | bjt }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="module-rail-empty">暂无动态</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            {% if has_permission('environment:create') %}
+            <button class="module-quick-item" type="button" data-bs-toggle="offcanvas" data-bs-target="#createEnvironmentDrawer">
+                <i class="bi bi-plus-lg"></i>
+                <span>新增环境</span>
+            </button>
+            {% endif %}
+            <a class="module-quick-item" href="{{ url_for('variable.list_variables') }}">
+                <i class="bi bi-braces-asterisk"></i>
+                <span>变量管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('scenario.list_scenarios') }}">
+                <i class="bi bi-diagram-3"></i>
+                <span>场景管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('project.list_projects') }}">
+                <i class="bi bi-folder2"></i>
+                <span>项目管理</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+        <button class="module-side-refresh" type="button">换一换</button>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="javascript:void(0)">
+                <span class="module-insight-icon icon-0"><i class="bi bi-file-earmark-code"></i></span>
+                <div>
+                    <strong>标准化 Base URL 与请求头</strong>
+                    <small>减少环境配置差异导致的执行波动</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('variable.list_variables') }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-braces-asterisk"></i></span>
+                <div>
+                    <strong>整理环境变量分层</strong>
+                    <small>将项目级与环境级变量分开维护</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block workspace_drawers %}
+{% if has_permission('environment:create') %}
+<div class="offcanvas offcanvas-end app-edit-drawer api-form-drawer" tabindex="-1" id="createEnvironmentDrawer">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title">新增环境</h5>
+            <small>创建新的运行环境与基础配置</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <form method="post" action="{{ url_for('environment.create_environment') }}" class="offcanvas-body drawer-form">
+        <div class="drawer-section">
+            <div class="drawer-section-title">基础信息</div>
+            <div class="mb-3">
+                <label class="form-label">所属项目</label>
+                <select class="form-select" name="project_id" required>
+                    {% for project in projects %}
+                    <option value="{{ project.id }}" {% if selected_project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">环境名称</label>
+                <input class="form-control" name="name" placeholder="例如：测试环境" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Base URL</label>
+                <input class="form-control" name="base_url" placeholder="例如：http://127.0.0.1:5001" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">默认请求头 JSON</label>
+                <textarea class="form-control" name="headers_json" rows="5">{}</textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">默认变量 JSON</label>
+                <textarea class="form-control" name="variables_json" rows="5">{}</textarea>
+            </div>
+            <div>
+                <label class="form-label">描述</label>
+                <input class="form-control" name="description" placeholder="请输入环境描述">
+            </div>
+        </div>
+        <div class="drawer-actions">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+            <button class="btn btn-primary" type="submit">创建环境</button>
+        </div>
+    </form>
 </div>
+{% endif %}
+
+{% if has_permission('environment:edit') %}
+{% for item in environments %}
+<div class="offcanvas offcanvas-end app-edit-drawer api-form-drawer" tabindex="-1" id="editEnvironmentDrawer{{ item.id }}">
+    <div class="offcanvas-header">
+        <div>
+            <h5 class="offcanvas-title">编辑环境</h5>
+            <small>ENV-{{ '%03d' | format(item.id) }} · {{ item.name }}</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <form method="post" action="{{ url_for('environment.edit_environment', environment_id=item.id) }}" class="offcanvas-body drawer-form">
+        <div class="drawer-section">
+            <div class="drawer-section-title">基础信息</div>
+            <div class="mb-3">
+                <label class="form-label">环境名称</label>
+                <input class="form-control" name="name" value="{{ item.name }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Base URL</label>
+                <input class="form-control" name="base_url" value="{{ item.base_url }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">默认请求头 JSON</label>
+                <textarea class="form-control" name="headers_json" rows="5">{{ item.headers_json }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">默认变量 JSON</label>
+                <textarea class="form-control" name="variables_json" rows="5">{{ item.variables_json }}</textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">描述</label>
+                <input class="form-control" name="description" value="{{ item.description }}">
+            </div>
+            <div>
+                <label class="form-label">状态</label>
+                <select class="form-select" name="is_active">
+                    <option value="1" {% if item.is_active %}selected{% endif %}>启用中</option>
+                    <option value="0" {% if not item.is_active %}selected{% endif %}>已停用</option>
+                </select>
+            </div>
+        </div>
+        <div class="drawer-actions">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">取消</button>
+            <button class="btn btn-primary" type="submit">保存修改</button>
+        </div>
+    </form>
 </div>
+{% endfor %}
+{% endif %}
 {% endblock %}

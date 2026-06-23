@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/app.css') }}?v=20260622-4" rel="stylesheet">
     <style>
         .app-edit-drawer {
             --bs-offcanvas-width: min(1240px, 94vw);
@@ -77,7 +77,7 @@
                     <input type="hidden" name="{{ key }}" value="{{ value }}">
                     {% endif %}
                 {% endfor %}
-                <select class="form-select form-select-sm sidebar-project-select" name="project_id" onchange="this.form.submit()" {% if not global_projects %}disabled{% endif %}>
+                <select class="form-select form-select-sm sidebar-project-select" name="project_id" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()" {% if not global_projects %}disabled{% endif %}>
                     <option value="" {% if not current_project_id %}selected{% endif %}>全部项目</option>
                     {% for project in global_projects %}
                     <option value="{{ project.id }}" {% if current_project_id == project.id %}selected{% endif %}>{{ project.name }}</option>
@@ -229,18 +229,13 @@
                 <small class="text-muted">{% block page_desc %}接口自动化测试平台{% endblock %}</small>
             </div>
             {% endblock %}
+            {% block workspace_topbar_page %}{% endblock %}
             <label class="topbar-search" for="globalSearch">
                 <i class="bi bi-search"></i>
                 <input id="globalSearch" type="search" placeholder="全局搜索（Ctrl + K）" autocomplete="off">
                 <kbd>Ctrl K</kbd>
             </label>
             <div class="topbar-actions">
-                {% if has_permission('testcase:create') %}
-                <a href="{{ url_for('testcase.create_testcase_page') }}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i>新建用例</a>
-                {% endif %}
-                {% if has_permission('ai:use') %}
-                <a href="{{ url_for('ai.parser_page') }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-stars"></i>AI 解析</a>
-                {% endif %}
                 {% if current_user %}
                 <button class="topbar-icon-btn" type="button" title="通知" aria-label="通知"><i class="bi bi-bell"></i><span class="topbar-notice-dot"></span></button>
                 <div class="dropdown">
@@ -284,7 +279,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}?v=20260616-5"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

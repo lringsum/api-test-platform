@@ -112,6 +112,12 @@ class TestCaseService:
         ("/material_tag/delete_tag", "素材标签删除标签接口"),
         ("/material_tag/batch_delete_tag", "素材标签批量删除标签接口"),
         ("/material_tag/get_available_tag_options", "素材标签获取可用标签选项接口"),
+        ("/material_work_order/create", "素材工单新建接口"),
+        ("/material_work_order/update_pending_fields", "素材工单编辑待接单需求字段接口"),
+        ("/material_work_order/get_create_form_meta", "素材工单新建表单元数据接口"),
+        ("/material_work_order/get_filter_options", "素材工单筛选项查询接口"),
+        ("/material_work_order/detail", "素材工单详情查询接口"),
+        ("/material_work_order/list", "素材工单列表查询接口"),
         ("/batch_add_to_folder", "新素材库批量加入文件夹接口"),
         ("/batch_set_favorite", "新素材库批量收藏接口"),
         ("/batch_set_pinned", "新素材库批量置顶接口"),
@@ -157,6 +163,8 @@ class TestCaseService:
             if fragment in url_text:
                 return name
 
+        if "material_work_order" in url_text:
+            return "素材工单接口"
         if "material_library" in url_text:
             return "素材库接口"
         if "/login" in url_text:
@@ -175,6 +183,22 @@ class TestCaseService:
         return query.order_by(TestCase.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
+
+    @staticmethod
+    def list_all_records(project_id=None, module_id=None):
+        query = TestCase.query.options(
+            joinedload(TestCase.project),
+            joinedload(TestCase.module),
+        )
+        if project_id:
+            query = query.filter_by(project_id=project_id)
+        if module_id:
+            query = query.filter_by(module_id=module_id)
+        return query.order_by(
+            TestCase.module_id.asc(),
+            TestCase.created_at.desc(),
+            TestCase.id.desc(),
+        ).all()
 
     @staticmethod
     def list_grouped(

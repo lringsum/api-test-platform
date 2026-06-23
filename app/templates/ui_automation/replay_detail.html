@@ -2,43 +2,82 @@
 
 {% block title %}UI 回放详情{% endblock %}
 {% block page_title %}UI 回放详情 #{{ run.id }}{% endblock %}
-{% block page_desc %}查看执行结果、基础信息、运行日志和逐步骤页面截图。{% endblock %}
+{% block page_desc %}查看执行结果、基础信息、运行日志和逐步页面截图。{% endblock %}
 
 {% block head %}
 <style>
+    .topbar {
+        border-radius: 0;
+        border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+    }
+
+    .topbar .replay-topbar-page {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 14px;
+        margin-right: auto;
+    }
+
+    .replay-topbar-title {
+        min-width: 0;
+    }
+
+    .replay-topbar-title h5 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+        color: #0f172a;
+        font-size: 1.12rem;
+        font-weight: 800;
+        letter-spacing: 0;
+    }
+
+    .replay-topbar-title small {
+        display: block;
+        margin-top: 3px;
+        color: #64748b;
+        font-size: 0.76rem;
+    }
+
     .replay-shell {
-        --replay-ink: #172033;
-        --replay-muted: #748096;
-        --replay-line: #e6ebf2;
+        --replay-ink: #0f172a;
+        --replay-muted: #64748b;
+        --replay-line: #e2e8f0;
         --replay-soft: #f6f8fb;
-        --replay-primary: #2468f2;
-        --replay-success: #12935f;
-        --replay-danger: #d93b4b;
+        --replay-primary: #2563eb;
+        --replay-success: #10a36a;
+        --replay-danger: #dc3545;
         display: grid;
-        gap: 16px;
+        gap: 14px;
     }
 
     .replay-card {
         overflow: hidden;
-        border: 1px solid var(--replay-line);
-        border-radius: 16px;
-        background: #fff;
-        box-shadow: 0 8px 24px rgba(24, 39, 75, 0.05);
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
     }
 
-    .replay-summary {
+    .replay-hero {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 24px;
+        gap: 22px;
         align-items: center;
-        padding: 20px 22px;
+        padding: 18px 20px;
+        background:
+            linear-gradient(90deg, rgba(37, 99, 235, 0.05), transparent 45%),
+            #ffffff;
     }
 
     .replay-eyebrow {
         margin-bottom: 5px;
-        color: var(--replay-muted);
-        font-size: 0.72rem;
-        font-weight: 800;
+        color: #2563eb;
+        font-size: 0.7rem;
+        font-weight: 900;
         letter-spacing: 0.08em;
         text-transform: uppercase;
     }
@@ -46,30 +85,41 @@
     .replay-title {
         margin: 0;
         color: var(--replay-ink);
-        font-size: 1.22rem;
-        font-weight: 800;
+        font-size: 1.2rem;
+        font-weight: 850;
+        line-height: 1.25;
     }
 
     .replay-subtitle {
-        margin: 6px 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin: 8px 0 0;
         color: var(--replay-muted);
-        font-size: 0.82rem;
+        font-size: 0.8rem;
     }
 
-    .replay-summary-side {
+    .replay-subtitle span + span::before {
+        content: "·";
+        margin-right: 7px;
+        color: #94a3b8;
+    }
+
+    .replay-hero-side {
         display: flex;
         align-items: center;
-        gap: 18px;
+        gap: 14px;
     }
 
     .replay-status {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        min-width: 150px;
         align-items: center;
         gap: 10px;
-        min-width: 145px;
-        padding: 11px 14px;
+        padding: 12px 14px;
         border-radius: 12px;
-        background: #eef9f4;
+        background: #eaf8f2;
         color: var(--replay-success);
     }
 
@@ -79,42 +129,78 @@
     }
 
     .replay-status.is-other {
-        background: #eff5ff;
+        background: #eff6ff;
         color: var(--replay-primary);
     }
 
-    .replay-status-dot {
-        width: 10px;
-        height: 10px;
-        flex: 0 0 auto;
-        border-radius: 50%;
-        background: currentColor;
-        box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 13%, transparent);
+    .replay-status i {
+        font-size: 1.15rem;
     }
 
     .replay-status strong {
         display: block;
-        font-size: 1rem;
+        font-size: 0.98rem;
         line-height: 1.1;
     }
 
     .replay-status small {
         display: block;
-        margin-top: 3px;
-        color: var(--replay-muted);
+        margin-top: 4px;
+        color: #64748b;
         font-size: 0.68rem;
     }
 
     .replay-actions {
         display: flex;
         flex-wrap: wrap;
+        justify-content: flex-end;
         gap: 8px;
+    }
+
+    .replay-actions .btn,
+    .replay-topbar-page .btn {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 10px;
+        font-weight: 700;
+    }
+
+    .replay-metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .replay-metric {
+        padding: 14px 16px;
+        border: 1px solid rgba(226, 232, 240, 0.85);
+        border-radius: 12px;
+        background: #ffffff;
+    }
+
+    .replay-metric span {
+        color: var(--replay-muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .replay-metric strong {
+        display: block;
+        margin-top: 5px;
+        color: var(--replay-ink);
+        font-size: 1.08rem;
+        font-weight: 850;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .replay-overview {
         display: grid;
-        grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.65fr);
-        gap: 16px;
+        grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
+        gap: 14px;
     }
 
     .replay-section-head {
@@ -122,15 +208,15 @@
         justify-content: space-between;
         align-items: center;
         gap: 16px;
-        padding: 16px 18px;
+        padding: 16px 18px 13px;
         border-bottom: 1px solid var(--replay-line);
     }
 
     .replay-section-head h5 {
         margin: 0;
         color: var(--replay-ink);
-        font-size: 0.96rem;
-        font-weight: 800;
+        font-size: 0.98rem;
+        font-weight: 850;
     }
 
     .replay-section-head p {
@@ -141,14 +227,14 @@
 
     .replay-info-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 1px;
         background: var(--replay-line);
     }
 
     .replay-info-item {
         min-width: 0;
-        padding: 15px 17px;
+        padding: 14px 16px;
         background: #fff;
     }
 
@@ -156,27 +242,30 @@
         margin-bottom: 5px;
         color: var(--replay-muted);
         font-size: 0.7rem;
+        font-weight: 700;
     }
 
     .replay-info-value {
         overflow: hidden;
         color: var(--replay-ink);
         font-size: 0.82rem;
-        font-weight: 700;
+        font-weight: 750;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
     .replay-log {
-        height: 240px;
+        height: 322px;
         margin: 0;
-        padding: 16px 18px;
+        padding: 17px 18px;
         overflow: auto;
-        background: #151a22;
+        background:
+            radial-gradient(circle at top right, rgba(37, 99, 235, 0.14), transparent 32%),
+            linear-gradient(180deg, #0e1728 0%, #0a1221 100%);
         color: #cbd5e1;
-        font-family: "IBM Plex Mono", "Cascadia Code", monospace;
+        font-family: var(--ui-font-mono);
         font-size: 0.72rem;
-        line-height: 1.65;
+        line-height: 1.68;
         white-space: pre-wrap;
     }
 
@@ -193,23 +282,23 @@
     .replay-steps {
         display: grid;
         gap: 12px;
-        padding: 16px;
-        background: var(--replay-soft);
+        padding: 14px;
+        background: #f7f9fc;
     }
 
     .replay-step {
         display: grid;
-        grid-template-columns: minmax(250px, 0.38fr) minmax(420px, 0.62fr);
+        grid-template-columns: minmax(300px, 0.38fr) minmax(460px, 0.62fr);
         overflow: hidden;
-        border: 1px solid var(--replay-line);
-        border-radius: 14px;
-        background: #fff;
+        border: 1px solid rgba(226, 232, 240, 0.96);
+        border-radius: 12px;
+        background: #ffffff;
         transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
     }
 
     .replay-step:hover {
-        border-color: #cbd8f0;
-        box-shadow: 0 10px 24px rgba(26, 56, 112, 0.08);
+        border-color: #c7d7f8;
+        box-shadow: 0 12px 26px rgba(37, 99, 235, 0.08);
         transform: translateY(-1px);
     }
 
@@ -225,29 +314,48 @@
         gap: 11px;
     }
 
-    .replay-step-index {
+    .replay-step-state {
         display: grid;
-        width: 30px;
-        height: 30px;
+        width: 24px;
+        height: 24px;
         flex: 0 0 auto;
         place-items: center;
-        border-radius: 9px;
-        background: #eaf1ff;
+        border-radius: 50%;
+        background: #eaf8f2;
+        color: var(--replay-success);
+        font-size: 0.78rem;
+        margin-top: 2px;
+    }
+
+    .replay-step-state.is-failed {
+        background: #fff1f2;
+        color: var(--replay-danger);
+    }
+
+    .replay-step-index {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+        background: #eef4ff;
         color: var(--replay-primary);
-        font-size: 0.76rem;
-        font-weight: 800;
+        font-size: 0.8rem;
+        font-weight: 850;
     }
 
     .replay-step-title {
         color: var(--replay-ink);
-        font-size: 0.88rem;
-        font-weight: 800;
+        font-size: 0.92rem;
+        font-weight: 850;
+        line-height: 1.35;
     }
 
     .replay-step-time {
-        margin-top: 3px;
+        margin-top: 4px;
         color: var(--replay-muted);
-        font-size: 0.7rem;
+        font-size: 0.72rem;
     }
 
     .replay-step-badge {
@@ -257,7 +365,7 @@
         background: #eaf8f2;
         color: var(--replay-success);
         font-size: 0.67rem;
-        font-weight: 800;
+        font-weight: 850;
     }
 
     .replay-step-badge.is-failed {
@@ -269,39 +377,44 @@
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        margin-top: 13px;
+        margin: 13px 0 14px 69px;
     }
 
     .replay-step-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
         padding: 4px 8px;
-        border-radius: 7px;
-        background: var(--replay-soft);
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        border-radius: 8px;
+        background: #f8fafc;
         color: #657086;
-        font-size: 0.67rem;
+        font-size: 0.68rem;
+        font-weight: 700;
     }
 
     .replay-step-detail {
-        margin-top: 12px;
-        padding: 10px 11px;
+        margin-left: 69px;
+        padding: 11px 12px;
         overflow: hidden;
-        border-radius: 9px;
-        background: #f7f9fc;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        border-radius: 10px;
+        background: #fbfdff;
         color: #58657a;
-        font-family: "IBM Plex Mono", "Cascadia Code", monospace;
-        font-size: 0.68rem;
-        line-height: 1.55;
-        text-overflow: ellipsis;
+        font-family: var(--ui-font-mono);
+        font-size: 0.69rem;
+        line-height: 1.58;
         word-break: break-all;
     }
 
     .replay-step-detail + .replay-step-detail {
-        margin-top: 7px;
+        margin-top: 8px;
     }
 
     .replay-step-error {
-        margin-top: 12px;
+        margin: 12px 0 0 69px;
         padding: 10px 11px;
-        border-radius: 9px;
+        border-radius: 10px;
         background: #fff1f2;
         color: #a52635;
         font-size: 0.72rem;
@@ -315,12 +428,8 @@
         padding: 12px;
         place-items: center;
         background:
-            linear-gradient(45deg, #f7f9fc 25%, transparent 25%),
-            linear-gradient(-45deg, #f7f9fc 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #f7f9fc 75%),
-            linear-gradient(-45deg, transparent 75%, #f7f9fc 75%);
-        background-position: 0 0, 0 8px, 8px -8px, -8px 0;
-        background-size: 16px 16px;
+            linear-gradient(90deg, rgba(248, 250, 252, 0.92), rgba(255, 255, 255, 0.68)),
+            #f8fafc;
     }
 
     .replay-step-shot img {
@@ -331,20 +440,24 @@
         border-radius: 10px;
         background: #fff;
         object-fit: contain;
-        box-shadow: 0 5px 16px rgba(31, 48, 82, 0.08);
+        box-shadow: 0 8px 18px rgba(31, 48, 82, 0.08);
     }
 
     .replay-shot-action {
         position: absolute;
         right: 20px;
         bottom: 20px;
+        min-height: 32px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
         padding: 6px 10px;
-        border: 1px solid rgba(255, 255, 255, 0.74);
-        border-radius: 8px;
-        background: rgba(15, 23, 42, 0.78);
+        border: 1px solid rgba(255, 255, 255, 0.72);
+        border-radius: 9px;
+        background: rgba(15, 23, 42, 0.76);
         color: #fff;
         font-size: 0.68rem;
-        font-weight: 700;
+        font-weight: 750;
         text-decoration: none;
         backdrop-filter: blur(8px);
     }
@@ -354,36 +467,57 @@
         color: #fff;
     }
 
-    .replay-shot-empty {
+    .replay-shot-empty,
+    .replay-artifact-empty {
+        padding: 34px 20px;
         color: var(--replay-muted);
-        font-size: 0.76rem;
+        font-size: 0.78rem;
+        text-align: center;
     }
 
-    @media (max-width: 1199.98px) {
-        .replay-overview {
-            grid-template-columns: 1fr;
-        }
-
-        .replay-step {
-            grid-template-columns: minmax(230px, 0.42fr) minmax(360px, 0.58fr);
-        }
+    .replay-artifacts {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        padding: 14px;
+        background: #f7f9fc;
     }
 
-    @media (max-width: 767.98px) {
-        .replay-summary,
-        .replay-summary-side {
-            grid-template-columns: 1fr;
-        }
+    .replay-artifact {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 12px;
+        border: 1px solid rgba(226, 232, 240, 0.96);
+        border-radius: 10px;
+        background: #ffffff;
+        color: inherit;
+        text-decoration: none;
+    }
 
-        .replay-summary-side {
-            display: grid;
-            gap: 12px;
-        }
+    .replay-artifact i {
+        color: #2563eb;
+        font-size: 1rem;
+    }
 
-        .replay-info-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
+    .replay-artifact strong {
+        display: block;
+        overflow: hidden;
+        color: var(--replay-ink);
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 
+    .replay-artifact small {
+        color: var(--replay-muted);
+        font-size: 0.68rem;
+    }
+
+    @media (max-width: 1280px) {
+        .replay-overview,
         .replay-step {
             grid-template-columns: 1fr;
         }
@@ -392,30 +526,86 @@
             border-right: 0;
             border-bottom: 1px solid var(--replay-line);
         }
+    }
 
-        .replay-step-shot {
-            min-height: 190px;
+    @media (max-width: 992px) {
+        .replay-hero,
+        .replay-hero-side {
+            grid-template-columns: 1fr;
+        }
+
+        .replay-hero-side {
+            display: grid;
+        }
+
+        .replay-actions {
+            justify-content: flex-start;
+        }
+
+        .replay-metrics,
+        .replay-artifacts {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .topbar .replay-topbar-page {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .replay-info-grid,
+        .replay-metrics,
+        .replay-artifacts {
+            grid-template-columns: 1fr;
+        }
+
+        .replay-step-meta,
+        .replay-step-detail,
+        .replay-step-error {
+            margin-left: 0;
+        }
+
+        .replay-step-heading {
+            flex-wrap: wrap;
         }
     }
 </style>
 {% endblock %}
 
+{% block topbar_page %}
+<div class="replay-topbar-page">
+    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('ui_auto.replays_page') }}">
+        <i class="bi bi-arrow-left"></i>返回列表
+    </a>
+    <div class="replay-topbar-title">
+        <h5>
+            UI 回放详情 #{{ run.id }}
+            <span class="badge rounded-pill {% if run.status == 'passed' %}text-bg-success{% elif run.status in ['failed', 'timeout'] %}text-bg-danger{% else %}text-bg-primary{% endif %}">
+                {% if run.status == 'passed' %}成功{% elif run.status == 'failed' %}失败{% elif run.status == 'timeout' %}超时{% else %}{{ run.status }}{% endif %}
+            </span>
+        </h5>
+        <small>执行完成 · 总耗时 {{ run.duration_ms }} ms · {{ run.finished_at|bjt if run.finished_at else '-' }}</small>
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="replay-shell" id="uiReplayDetailPage">
-    <section class="replay-card replay-summary">
+    <section class="replay-card replay-hero">
         <div>
             <div class="replay-eyebrow">Execution Replay</div>
             <h4 class="replay-title">{{ run.script.name if run.script else '未命名脚本' }}</h4>
             <p class="replay-subtitle">
-                {{ run.summary.get('environment_name', '未指定环境') }}
-                · {{ run.browser_type|capitalize }}
-                · v{{ run.summary.get('script_version', '-') }}
-                · {{ steps|length }} 个步骤
+                <span>{{ run.summary.get('environment_name', '未指定环境') }}</span>
+                <span>{{ run.browser_type|capitalize }}</span>
+                <span>v{{ run.summary.get('script_version', '-') }}</span>
+                <span>{{ steps|length }} 个步骤</span>
             </p>
         </div>
-        <div class="replay-summary-side">
+        <div class="replay-hero-side">
             <div class="replay-status {% if run.status in ['failed', 'timeout'] %}is-failed{% elif run.status != 'passed' %}is-other{% endif %}">
-                <span class="replay-status-dot"></span>
+                <i class="bi {% if run.status == 'passed' %}bi-check-circle-fill{% elif run.status in ['failed', 'timeout'] %}bi-x-circle-fill{% else %}bi-hourglass-split{% endif %}"></i>
                 <span>
                     <strong>
                         {% if run.status == 'passed' %}执行成功
@@ -423,16 +613,41 @@
                         {% elif run.status == 'timeout' %}执行超时
                         {% else %}{{ run.status }}{% endif %}
                     </strong>
-                    <small>{{ run.duration_ms }} ms · 重试 {{ run.retry_count }}/{{ run.max_retry }}</small>
+                    <small>重试 {{ run.retry_count }}/{{ run.max_retry }}</small>
                 </span>
             </div>
             <div class="replay-actions">
-                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('ui_auto.replays_page') }}">返回列表</a>
-                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('ui_auto.executions_page', project_id=run.project_id) }}">执行计划</a>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('ui_auto.replays_page') }}">
+                    <i class="bi bi-list-ul"></i>返回列表
+                </a>
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('ui_auto.executions_page', project_id=run.project_id) }}">
+                    <i class="bi bi-activity"></i>执行详情
+                </a>
                 {% if log_artifact %}
-                <a class="btn btn-primary btn-sm" href="{{ url_for('ui_auto.download_artifact', run_id=run.id, artifact_id=log_artifact.id) }}">下载日志</a>
+                <a class="btn btn-primary btn-sm" href="{{ url_for('ui_auto.download_artifact', run_id=run.id, artifact_id=log_artifact.id) }}">
+                    <i class="bi bi-download"></i>下载日志
+                </a>
                 {% endif %}
             </div>
+        </div>
+    </section>
+
+    <section class="replay-metrics">
+        <div class="replay-metric">
+            <span>执行时长</span>
+            <strong>{{ run.duration_ms }} ms</strong>
+        </div>
+        <div class="replay-metric">
+            <span>通过步骤</span>
+            <strong>{{ steps|selectattr('status', 'equalto', 'passed')|list|length }}/{{ steps|length }}</strong>
+        </div>
+        <div class="replay-metric">
+            <span>浏览器</span>
+            <strong>{{ run.browser_type|capitalize }}</strong>
+        </div>
+        <div class="replay-metric">
+            <span>触发类型</span>
+            <strong>{{ run.trigger_type_label }}</strong>
         </div>
     </section>
 
@@ -441,7 +656,7 @@
             <header class="replay-section-head">
                 <div>
                     <h5>基础信息</h5>
-                    <p>本次用例执行的脚本、环境和时间信息</p>
+                    <p>本次执行的脚本、环境和时间信息</p>
                 </div>
             </header>
             <div class="replay-info-grid">
@@ -466,12 +681,8 @@
                     <div class="replay-info-value" title="{{ run.summary.get('environment_base_url', '-') }}">{{ run.summary.get('environment_base_url', '-') }}</div>
                 </div>
                 <div class="replay-info-item">
-                    <div class="replay-info-label">触发来源</div>
-                    <div class="replay-info-value">{{ run.trigger_source or '-' }}</div>
-                </div>
-                <div class="replay-info-item">
-                    <div class="replay-info-label">触发人</div>
-                    <div class="replay-info-value">{{ run.trigger_user.display_name if run.trigger_user else '-' }}</div>
+                    <div class="replay-info-label">触发人员</div>
+                    <div class="replay-info-value">{{ run.trigger_person_name }}</div>
                 </div>
                 <div class="replay-info-item">
                     <div class="replay-info-label">开始时间</div>
@@ -494,11 +705,16 @@
         </section>
 
         <section class="replay-card">
-            <header class="replay-section-head">
+            <header class="replay-section-head" data-regression-marker="日志浏览">
                 <div>
-                    <h5>日志浏览</h5>
-                    <p>查看本次执行的关键控制台输出</p>
+                    <h5>日志记录</h5>
+                    <p>执行过程的控制台输出与关键事件</p>
                 </div>
+                {% if log_artifact %}
+                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('ui_auto.download_artifact', run_id=run.id, artifact_id=log_artifact.id) }}">
+                    <i class="bi bi-download"></i>下载日志
+                </a>
+                {% endif %}
             </header>
             {% if log_preview %}
             <pre class="replay-log">{{ log_preview }}</pre>
@@ -512,7 +728,7 @@
         <header class="replay-section-head">
             <div>
                 <h5>执行步骤与页面截图</h5>
-                <p>按执行顺序查看操作、耗时、状态及操作完成后的页面画面</p>
+                <p>按执行顺序查看操作、耗时、状态以及操作完成后的页面画面</p>
             </div>
             <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ steps|length }} 个步骤</span>
         </header>
@@ -524,6 +740,9 @@
             <article class="replay-step">
                 <div class="replay-step-main">
                     <div class="replay-step-heading">
+                        <span class="replay-step-state {% if step.status == 'failed' %}is-failed{% endif %}">
+                            <i class="bi {% if step.status == 'failed' %}bi-x{% else %}bi-check{% endif %}"></i>
+                        </span>
                         <span class="replay-step-index">{{ step.step_index }}</span>
                         <div>
                             <div class="replay-step-title">{{ step.step_title }}</div>
@@ -537,9 +756,9 @@
                     </div>
 
                     <div class="replay-step-meta">
-                        {% if raw_meta.get('method') %}<span>方法 {{ raw_meta.get('method') }}</span>{% endif %}
-                        {% if raw_meta.get('attempt') %}<span>第 {{ raw_meta.get('attempt') }} 次执行</span>{% endif %}
-                        <span>{{ '运行时采集' if raw_meta.get('source') == 'runtime' else '源码推断' }}</span>
+                        {% if raw_meta.get('method') %}<span><i class="bi bi-code-square"></i>方法 {{ raw_meta.get('method') }}</span>{% endif %}
+                        {% if raw_meta.get('attempt') %}<span><i class="bi bi-arrow-repeat"></i>第 {{ raw_meta.get('attempt') }} 次执行</span>{% endif %}
+                        <span><i class="bi bi-database-check"></i>{{ '运行时采集' if raw_meta.get('source') == 'runtime' else '源码推断' }}</span>
                     </div>
 
                     {% if step.locator %}
@@ -559,7 +778,9 @@
                 <div class="replay-step-shot">
                     {% if step.screenshot_preview_url %}
                     <img src="{{ step.screenshot_preview_url }}" alt="步骤 {{ step.step_index }} 页面截图" loading="lazy">
-                    <a class="replay-shot-action" href="{{ step.screenshot_preview_url }}" target="_blank">查看大图</a>
+                    <a class="replay-shot-action" href="{{ step.screenshot_preview_url }}" target="_blank">
+                        <i class="bi bi-arrows-fullscreen"></i>查看大图
+                    </a>
                     {% else %}
                     <div class="replay-shot-empty">该步骤没有采集到页面截图</div>
                     {% endif %}
@@ -569,6 +790,31 @@
         </div>
         {% else %}
         <div class="empty-box m-3">当前执行没有采集到 Playwright 操作步骤。</div>
+        {% endif %}
+    </section>
+
+    <section class="replay-card" id="replay-artifacts">
+        <header class="replay-section-head">
+            <div>
+                <h5>执行产物</h5>
+                <p>截图、日志、Trace、报告等可下载产物</p>
+            </div>
+            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ artifacts|length }} 个文件</span>
+        </header>
+        {% if artifacts %}
+        <div class="replay-artifacts">
+            {% for item in artifacts %}
+            <a class="replay-artifact" href="{{ item.download_url }}">
+                <i class="bi {% if item.artifact.artifact_type == 'screenshot' %}bi-image{% elif item.artifact.artifact_type == 'log' %}bi-terminal{% elif item.artifact.artifact_type == 'trace' %}bi-diagram-3{% elif item.artifact.artifact_type == 'video' %}bi-camera-video{% else %}bi-file-earmark{% endif %}"></i>
+                <span class="min-w-0">
+                    <strong title="{{ item.artifact.file_name }}">{{ item.artifact.file_name }}</strong>
+                    <small>{{ item.artifact.artifact_type }} · {{ item.artifact.file_size }} bytes</small>
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="replay-artifact-empty">暂无执行产物</div>
         {% endif %}
     </section>
 </div>

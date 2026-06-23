@@ -60,13 +60,11 @@ def run_project_management_smoke(session, scenario):
     missing = [
         marker
         for marker in (
-            "项目工作台",
-            "project-filter-form",
-            "project-list-card",
-            "projectSideToggle",
-            "projectSidePanel",
+            "project-workspace-page",
+            "module-filter-card",
+            "module-list-card",
             "createProjectDrawer",
-            "快捷入口",
+            "module-quick-grid",
         )
         if marker not in html
     ]
@@ -86,7 +84,56 @@ def run_project_management_empty(session, scenario):
         timeout=10,
     )
     response.raise_for_status()
-    missing = [] if "暂时没有匹配的项目" in response.text else ["project_empty_state"]
+    missing = [] if "module-empty-state" in response.text else ["project_empty_state"]
+    return {
+        "name": scenario["name"],
+        "module": scenario["module"],
+        "kind": scenario["kind"],
+        "status": "PASS" if not missing else "FAIL",
+        "missing": missing,
+    }
+
+
+def run_scenario_management_smoke(session, scenario):
+    response = session.get(f"{BASE_URL}/scenarios/", timeout=10)
+    response.raise_for_status()
+    html = response.text
+    missing = [
+        marker
+        for marker in (
+            "场景列表",
+            "createScenarioDrawer",
+            "createScenarioForm",
+            "scenarioCreateProject",
+            "scenarioCreateModule",
+            "scenarioCreatePreviewName",
+            "创建并编排",
+            'data-project-id="',
+        )
+        if marker not in html
+    ]
+    history_response = session.get(f"{BASE_URL}/scenarios/executions/history", timeout=10)
+    history_response.raise_for_status()
+    for marker in ("触发类型", "触发人员"):
+        if marker not in history_response.text:
+            missing.append(f"scenario_history_{marker}")
+    return {
+        "name": scenario["name"],
+        "module": scenario["module"],
+        "kind": scenario["kind"],
+        "status": "PASS" if not missing else "FAIL",
+        "missing": missing,
+    }
+
+
+def run_scenario_management_empty(session, scenario):
+    response = session.get(
+        f"{BASE_URL}/scenarios/",
+        params={"keyword": f"gate-empty-{uuid.uuid4().hex}"},
+        timeout=10,
+    )
+    response.raise_for_status()
+    missing = [] if "当前还没有场景" in response.text else ["scenario_empty_state"]
     return {
         "name": scenario["name"],
         "module": scenario["module"],
@@ -109,6 +156,17 @@ def run_execution_smoke(session, scenario):
     missing = [marker for marker in markers if marker not in html]
     if scenario.get("expect_checklist") and "selectedTestcaseList" not in html:
         missing.append("selectedTestcaseList")
+    if scenario.get("expect_selected_button_feedback_without_environment"):
+        selected_button_rule = (
+            'setElementDisabled("runSelectedBtn", '
+            '!projectId || !selectedTestcaseIds.length || !panelVisible);'
+        )
+        if selected_button_rule not in html:
+            missing.append("selected_button_enabled_after_selection")
+        if 'showToast("primary", "请先选择环境")' not in html:
+            missing.append("environment_required_feedback")
+        if "execution-toast-container" not in html:
+            missing.append("environment_feedback_centered")
     if "加载数据" in html:
         missing.append("load_button_removed")
 
@@ -128,8 +186,46 @@ def run_execution_smoke(session, scenario):
         missing.append("environments")
     if not data.get("modules"):
         missing.append("modules")
-    if not any(scenario["expected_testcase_keyword"] in name for name in testcase_names):
+    keyword = str(scenario["expected_testcase_keyword"]).lower()
+    matching_testcase = next(
+        (
+            item
+            for item in data.get("testcases", [])
+            if keyword in str(item.get("name", "")).lower()
+        ),
+        None,
+    )
+    if not matching_testcase:
         missing.append("testcases")
+    if scenario.get("expect_testcase_run_link_with_project"):
+        testcase_page_response = session.get(
+            f"{BASE_URL}/testcases/",
+            params={"project_id": project_id},
+            timeout=10,
+        )
+        testcase_page_response.raise_for_status()
+        testcase_html = testcase_page_response.text
+        run_link_fragment = f"/executions/run?project_id={project_id}&amp;testcase_id="
+        if run_link_fragment not in testcase_html:
+            missing.append("testcase_run_link_with_project")
+    if scenario.get("expect_context_card") and matching_testcase:
+        context_response = session.get(
+            f"{BASE_URL}/executions/run",
+            params={"project_id": project_id, "testcase_id": matching_testcase["id"]},
+            timeout=10,
+        )
+        context_response.raise_for_status()
+        context_html = context_response.text
+        for marker in (
+            "executionContextDetailCard",
+            "executionContextProject",
+            "executionContextFeature",
+            "executionContextUrl",
+            "executionContextTestcase",
+            matching_testcase["url"],
+        ):
+            if marker not in context_html:
+                missing.append(f"context:{marker}")
 
     return {
         "name": scenario["name"],
@@ -909,7 +1005,7 @@ def run_ui_replay_smoke(session, scenario):
         )
         list_response.raise_for_status()
         list_html = list_response.text
-        for marker in ("uiReplayPage", "replayFilterForm", script_name, script_code):
+        for marker in ("uiReplayPage", "replayFilterForm", "触发类型", "触发人员", script_name, script_code):
             if marker not in list_html:
                 missing.append(marker)
 
@@ -921,6 +1017,8 @@ def run_ui_replay_smoke(session, scenario):
             "基础信息",
             "日志浏览",
             "执行步骤与页面截图",
+            "触发类型",
+            "触发人员",
             script_name,
         ):
             if marker not in detail_html:
@@ -1239,6 +1337,10 @@ def run_scenario(session, scenario):
         return run_project_management_smoke(session, scenario)
     if scenario["name"] == "project_management_empty":
         return run_project_management_empty(session, scenario)
+    if scenario["name"] == "scenario_management_smoke":
+        return run_scenario_management_smoke(session, scenario)
+    if scenario["name"] == "scenario_management_empty":
+        return run_scenario_management_empty(session, scenario)
     if scenario["name"] == "execution_smoke":
         return run_execution_smoke(session, scenario)
     if scenario["name"] == "execution_anomaly_empty":
@@ -1262,6 +1364,9 @@ def run_scenario(session, scenario):
         missing = []
         if "报告回放" not in execution_html:
             missing.append("execution_report_panel")
+        for marker in ("触发类型", "触发人员"):
+            if marker not in execution_html:
+                missing.append(f"execution_detail_{marker}")
         if "查看执行详情" not in report_html:
             missing.append("report_back_link")
         if "回放" not in report_html:

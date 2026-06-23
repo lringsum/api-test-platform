@@ -53,6 +53,47 @@
         </div>
         {% endif %}
 
+        <div id="executionContextBanner" class="alert alert-primary execution-context-banner d-none" role="status">
+            <div>
+                <div class="fw-semibold mb-1">已为你定位到来源接口</div>
+                <div id="executionContextText" class="small mb-0"></div>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" id="clearExecutionContextBtn" type="button">查看全部用例</button>
+        </div>
+
+        <div id="executionContextDetailCard" class="execution-context-detail-card d-none">
+            <div class="execution-context-detail-head">
+                <strong>当前接口信息</strong>
+                <span class="execution-context-detail-hint">从“去执行”直接带入</span>
+            </div>
+            <div class="execution-context-detail-grid">
+                <div class="execution-context-detail-item">
+                    <span>项目</span>
+                    <strong id="executionContextProject">-</strong>
+                </div>
+                <div class="execution-context-detail-item">
+                    <span>模块</span>
+                    <strong id="executionContextModule">-</strong>
+                </div>
+                <div class="execution-context-detail-item">
+                    <span>接口名称</span>
+                    <strong id="executionContextFeature">-</strong>
+                </div>
+                <div class="execution-context-detail-item execution-context-detail-item-wide">
+                    <span>接口地址</span>
+                    <code id="executionContextUrl">-</code>
+                </div>
+                <div class="execution-context-detail-item">
+                    <span>请求方法</span>
+                    <strong id="executionContextMethod">-</strong>
+                </div>
+                <div class="execution-context-detail-item execution-context-detail-item-wide">
+                    <span>来源用例</span>
+                    <strong id="executionContextTestcase">-</strong>
+                </div>
+            </div>
+        </div>
+
         <div id="testcasePanel" class="d-none">
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center mb-1">
@@ -83,6 +124,8 @@
 {% block scripts %}
 <script>
 const currentProjectId = {{ current_project_id|tojson }};
+const currentProjectName = {{ (current_project.name if current_project else '')|tojson }};
+const initialExecutionContext = {{ initial_execution_context|tojson }};
 </script>
 <style>
 .testcase-checklist {
@@ -97,6 +140,10 @@ const currentProjectId = {{ current_project_id|tojson }};
     margin-left: 0;
     padding-left: 1.75rem !important;
 }
+.testcase-checklist-item.is-context-primary {
+    background: rgba(37, 99, 235, 0.06);
+    border-color: rgba(37, 99, 235, 0.16);
+}
 .testcase-checklist-item .testcase-checkbox {
     margin-top: 0.2rem;
     margin-left: -1.25rem;
@@ -106,17 +153,189 @@ const currentProjectId = {{ current_project_id|tojson }};
     flex: 1;
     min-width: 0;
     line-height: 1.4;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
+}
+.testcase-checklist-item .testcase-context-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.5rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.12);
+    color: #1d4ed8;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.execution-context-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid rgba(37, 99, 235, 0.18);
+    background: linear-gradient(135deg, rgba(239, 246, 255, 0.96) 0%, rgba(219, 234, 254, 0.92) 100%);
+    color: #1e3a8a;
+}
+.execution-context-detail-card {
+    margin-bottom: 1rem;
+    padding: 1rem 1.125rem;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 14px;
+    background: #f8fbff;
+}
+.execution-context-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.875rem;
+}
+.execution-context-detail-hint {
+    color: #64748b;
+    font-size: 0.875rem;
+}
+.execution-context-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+.execution-context-detail-item {
+    min-width: 0;
+    padding: 0.75rem 0.875rem;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+}
+.execution-context-detail-item span {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: #64748b;
+    font-size: 0.8125rem;
+}
+.execution-context-detail-item strong,
+.execution-context-detail-item code {
+    display: block;
+    color: #0f172a;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    word-break: break-all;
+}
+.execution-context-detail-item code {
+    padding: 0;
+    background: transparent;
+}
+.execution-context-detail-item-wide {
+    grid-column: 1 / -1;
+}
+.execution-toast-container {
+    top: 0.75rem !important;
+    right: auto !important;
+    left: calc(50% + 120px) !important;
+    width: min(440px, calc(100vw - 2rem));
+    transform: translateX(-50%);
+}
+.execution-toast-container .toast {
+    width: 100%;
+    max-width: none;
     overflow: hidden;
-    text-overflow: ellipsis;
+    border-radius: 10px;
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+}
+.execution-toast-container .toast.text-bg-primary {
+    color: #ffffff !important;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    border: 1px solid rgba(147, 197, 253, 0.72) !important;
+    box-shadow: 0 14px 34px rgba(37, 99, 235, 0.24);
+}
+@media (max-width: 991.98px) {
+    .execution-toast-container {
+        left: 50% !important;
+    }
+    .execution-context-banner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .execution-context-detail-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 <script>
 let loadedTestcases = [];
 let lastRunStartedAt = null;
+let activeExecutionContext = initialExecutionContext && initialExecutionContext.testcase_id
+    ? initialExecutionContext
+    : null;
 
 function nowText() {
     return new Date().toLocaleString();
+}
+
+function normalizeId(value) {
+    return value === null || value === undefined ? "" : String(value);
+}
+
+function matchesExecutionContext(testcase, context) {
+    if (!context) return false;
+    return normalizeId(testcase.module_id) === normalizeId(context.module_id)
+        && String(testcase.method || "").toUpperCase() === String(context.method || "").toUpperCase()
+        && String(testcase.url || "").trim() === String(context.url || "").trim();
+}
+
+function buildExecutionContextText(context) {
+    if (!context) return "";
+    const label = context.feature_name || "当前接口";
+    const moduleName = context.module_name || "当前模块";
+    const testcaseName = context.testcase_name || "来源用例";
+    return `${moduleName} / ${label} [${context.method || "-"} ${context.url || "-"}]，已自动勾选：${testcaseName}`;
+}
+
+function renderExecutionContextBanner() {
+    const banner = document.getElementById("executionContextBanner");
+    const text = document.getElementById("executionContextText");
+    const clearBtn = document.getElementById("clearExecutionContextBtn");
+    if (!banner || !text || !clearBtn) return;
+
+    if (!activeExecutionContext) {
+        banner.classList.add("d-none");
+        text.textContent = "";
+        clearBtn.classList.add("d-none");
+        return;
+    }
+
+    banner.classList.remove("d-none");
+    clearBtn.classList.remove("d-none");
+    text.textContent = buildExecutionContextText(activeExecutionContext);
+}
+
+function setTextContent(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    element.textContent = value || "-";
+}
+
+function renderExecutionContextDetails() {
+    const card = document.getElementById("executionContextDetailCard");
+    if (!card) return;
+
+    if (!activeExecutionContext) {
+        card.classList.add("d-none");
+        setTextContent("executionContextProject", "-");
+        setTextContent("executionContextModule", "-");
+        setTextContent("executionContextFeature", "-");
+        setTextContent("executionContextUrl", "-");
+        setTextContent("executionContextMethod", "-");
+        setTextContent("executionContextTestcase", "-");
+        return;
+    }
+
+    card.classList.remove("d-none");
+    setTextContent("executionContextProject", activeExecutionContext.project_name || currentProjectName || "-");
+    setTextContent("executionContextModule", activeExecutionContext.module_name || "-");
+    setTextContent("executionContextFeature", activeExecutionContext.feature_name || "当前接口");
+    setTextContent("executionContextUrl", activeExecutionContext.url || "-");
+    setTextContent("executionContextMethod", activeExecutionContext.method || "-");
+    setTextContent("executionContextTestcase", activeExecutionContext.testcase_name || "-");
 }
 
 function showStatusBar(type, text) {
@@ -138,7 +357,7 @@ function ensureToastContainer() {
     if (container) return container;
     container = document.createElement("div");
     container.id = "toastContainer";
-    container.className = "toast-container position-fixed top-0 end-0 p-3";
+    container.className = "toast-container execution-toast-container position-fixed p-3";
     container.style.zIndex = "1080";
     document.body.appendChild(container);
     return container;
@@ -239,6 +458,26 @@ function fillSelectOptions(selectId, options, placeholder, labelBuilder) {
     });
 }
 
+function getDisplayTestcases() {
+    let visibleTestcases = activeExecutionContext
+        ? loadedTestcases.filter((testcase) => matchesExecutionContext(testcase, activeExecutionContext))
+        : [...loadedTestcases];
+
+    if (!activeExecutionContext || !activeExecutionContext.testcase_id) {
+        return visibleTestcases;
+    }
+
+    const targetId = normalizeId(activeExecutionContext.testcase_id);
+    return [...visibleTestcases].sort((left, right) => {
+        const leftPriority = normalizeId(left.id) === targetId ? 0 : 1;
+        const rightPriority = normalizeId(right.id) === targetId ? 0 : 1;
+        if (leftPriority !== rightPriority) {
+            return leftPriority - rightPriority;
+        }
+        return 0;
+    });
+}
+
 function fillMultiTestcases(testcases) {
     const container = document.getElementById("selectedTestcaseList");
     if (!container) return;
@@ -257,6 +496,13 @@ function fillMultiTestcases(testcases) {
         item.className = "form-check testcase-checklist-item px-2 py-2 mb-0 border-bottom";
         item.dataset.moduleId = testcase.module_id || "";
         item.title = buildTestcaseLabel(testcase);
+        if (
+            activeExecutionContext
+            && normalizeId(testcase.id) === normalizeId(activeExecutionContext.testcase_id)
+        ) {
+            item.classList.add("is-context-primary");
+            item.dataset.contextPrimary = "1";
+        }
 
         const input = document.createElement("input");
         input.className = "form-check-input testcase-checkbox";
@@ -267,11 +513,56 @@ function fillMultiTestcases(testcases) {
         text.className = "form-check-label";
         text.textContent = buildTestcaseLabel(testcase);
 
+        if (
+            activeExecutionContext
+            && normalizeId(testcase.id) === normalizeId(activeExecutionContext.testcase_id)
+        ) {
+            const badge = document.createElement("span");
+            badge.className = "testcase-context-badge";
+            badge.textContent = "当前来源用例";
+            text.appendChild(badge);
+        }
+
         item.appendChild(input);
         item.appendChild(text);
         container.appendChild(item);
     });
     updateToggleAllButtonState();
+}
+
+function renderTestcaseChecklist() {
+    const visibleTestcases = getDisplayTestcases();
+    fillMultiTestcases(visibleTestcases);
+
+    if (activeExecutionContext && activeExecutionContext.testcase_id) {
+        const checkbox = document.querySelector(`.testcase-checkbox[value="${activeExecutionContext.testcase_id}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+            checkbox.closest(".testcase-checklist-item")?.scrollIntoView({
+                block: "nearest",
+            });
+        }
+    }
+    updateExecutionState();
+}
+
+function applyExecutionContextToControls() {
+    if (!activeExecutionContext) return;
+    const moduleSelect = document.getElementById("moduleId");
+    if (moduleSelect && activeExecutionContext.module_id) {
+        moduleSelect.value = normalizeId(activeExecutionContext.module_id);
+    }
+}
+
+function clearExecutionContext(options = {}) {
+    activeExecutionContext = null;
+    renderExecutionContextBanner();
+    renderExecutionContextDetails();
+    if (options.resetModule !== false) {
+        const moduleSelect = document.getElementById("moduleId");
+        if (moduleSelect) moduleSelect.value = "";
+    }
+    renderTestcaseChecklist();
 }
 
 function updateExecutionState() {
@@ -288,7 +579,7 @@ function updateExecutionState() {
     setElementDisabled("runProjectBtn", !projectId || !environmentId);
     setElementDisabled("runModuleBtn", !projectId || !environmentId || !moduleId || !panelVisible);
     setElementDisabled("runTestcaseBtn", !projectId || !environmentId || selectedTestcaseIds.length !== 1 || !panelVisible);
-    setElementDisabled("runSelectedBtn", !projectId || !environmentId || !selectedTestcaseIds.length || !panelVisible);
+    setElementDisabled("runSelectedBtn", !projectId || !selectedTestcaseIds.length || !panelVisible);
     updateToggleAllButtonState();
 }
 
@@ -298,9 +589,12 @@ function ensureProjectAndEnvironment() {
         showResultText("runResult", "请先选择当前项目");
         return false;
     }
-    const environmentId = document.getElementById("environmentId").value;
+    const environmentSelect = document.getElementById("environmentId");
+    const environmentId = environmentSelect.value;
     if (!environmentId) {
         showResultText("runResult", "请先选择环境");
+        showToast("primary", "请先选择环境");
+        environmentSelect.focus();
         return false;
     }
     return true;
@@ -330,10 +624,17 @@ async function loadRunOptions(projectId) {
         fillSelectOptions("environmentId", data.environments || [], "请选择环境", (item) => `${item.name} - ${item.base_url}`);
         fillSelectOptions("moduleId", data.modules || [], "全部模块", (item) => item.name);
         loadedTestcases = data.testcases || [];
-        fillMultiTestcases(loadedTestcases);
+        applyExecutionContextToControls();
+        renderExecutionContextBanner();
+        renderExecutionContextDetails();
+        renderTestcaseChecklist();
         document.getElementById("testcasePanel").classList.remove("d-none");
         updateExecutionState();
-        showResultText("runResult", "查询成功，可勾选用例执行");
+        if (activeExecutionContext) {
+            showResultText("runResult", "已按来源接口自动定位，并勾选当前用例，可直接选择环境后执行。");
+        } else {
+            showResultText("runResult", "查询成功，可勾选用例执行");
+        }
     } catch (error) {
         showResultText("runResult", error.message);
     }
@@ -370,6 +671,7 @@ document.getElementById("searchBtn").addEventListener("click", async function ()
     await loadRunOptions(currentProjectId);
 });
 document.getElementById("resetBtn").addEventListener("click", function () {
+    clearExecutionContext({ resetModule: true });
     fillSelectOptions("environmentId", [], "请选择环境", (item) => `${item.name} - ${item.base_url}`);
     fillSelectOptions("moduleId", [], "全部模块", (item) => item.name);
     fillMultiTestcases([]);
@@ -379,7 +681,16 @@ document.getElementById("resetBtn").addEventListener("click", function () {
     showResultText("runResult", "筛选条件已清空");
 });
 document.getElementById("environmentId").addEventListener("change", updateExecutionState);
-document.getElementById("moduleId").addEventListener("change", updateExecutionState);
+document.getElementById("moduleId").addEventListener("change", function (event) {
+    if (
+        activeExecutionContext
+        && normalizeId(event.target.value) !== normalizeId(activeExecutionContext.module_id)
+    ) {
+        clearExecutionContext({ resetModule: false });
+        return;
+    }
+    updateExecutionState();
+});
 document.addEventListener("change", function (event) {
     if (event.target.classList.contains("testcase-checkbox")) {
         updateExecutionState();
@@ -393,6 +704,10 @@ document.getElementById("toggleAllVisibleBtn").addEventListener("click", functio
         checkbox.checked = !allChecked;
     });
     updateExecutionState();
+});
+document.getElementById("clearExecutionContextBtn").addEventListener("click", function () {
+    clearExecutionContext({ resetModule: true });
+    showResultText("runResult", "已切换为全部用例视图，可继续自由选择执行范围。");
 });
 {% if has_permission('execution:run') %}
 document.getElementById("runTestcaseBtn").addEventListener("click", async function () {

@@ -1,106 +1,238 @@
-{% extends "base.html" %}
+{% extends "shared/workspace_page.html" %}
 
 {% block title %}场景执行历史{% endblock %}
 {% block page_title %}场景执行历史{% endblock %}
 {% block page_desc %}查看联动场景的执行记录与结果{% endblock %}
+{% block topbar_class %}topbar-without-page{% endblock %}
+{% block topbar_page %}{% endblock %}
 
-{% block content %}
-<div class="card mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <strong>查询条件</strong>
-        <small class="text-muted">按当前项目、场景、环境和状态过滤执行记录</small>
+{% set workspace_page_class = 'scenario-history-page' %}
+{% set history_total = pagination.total %}
+{% set history_page_total = pagination.items | length %}
+{% set history_stats = namespace(passed=0, failed=0, partial=0) %}
+{% for item in pagination.items %}
+    {% if item.status == 'passed' %}
+        {% set history_stats.passed = history_stats.passed + 1 %}
+    {% elif item.status == 'failed' %}
+        {% set history_stats.failed = history_stats.failed + 1 %}
+    {% else %}
+        {% set history_stats.partial = history_stats.partial + 1 %}
+    {% endif %}
+{% endfor %}
+
+{% block workspace_heading %}场景执行历史{% endblock %}
+{% block workspace_subtitle %}查看联动场景的执行记录与结果{% endblock %}
+
+{% block workspace_actions %}
+    <a class="btn btn-outline-primary module-secondary-btn" href="{{ url_for('scenario.list_scenarios') }}">
+        <i class="bi bi-diagram-3"></i>
+        场景列表
+    </a>
+    <a class="btn btn-outline-primary module-secondary-btn" href="{% if selected_project_id %}{{ url_for('scenario.scenario_execution_history', project_id=selected_project_id) }}{% else %}{{ url_for('scenario.scenario_execution_history') }}{% endif %}">
+        <i class="bi bi-clock-history"></i>
+        刷新历史
+    </a>
+{% endblock %}
+
+{% block workspace_metrics %}
+<section class="module-metrics-grid">
+    <article class="module-metric-card metric-blue">
+        <span class="module-metric-icon"><i class="bi bi-collection"></i></span>
+        <div class="module-metric-copy">
+            <small>记录总数</small>
+            <strong>{{ history_total }}</strong>
+            <span>当前筛选条件下总记录</span>
+        </div>
+        <div class="module-metric-spark spark-blue"></div>
+    </article>
+    <article class="module-metric-card metric-green">
+        <span class="module-metric-icon"><i class="bi bi-check2-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>当前页成功</small>
+            <strong>{{ history_stats.passed }}</strong>
+            <span>当前页成功执行记录</span>
+        </div>
+        <div class="module-metric-spark spark-green"></div>
+    </article>
+    <article class="module-metric-card metric-orange">
+        <span class="module-metric-icon"><i class="bi bi-x-circle"></i></span>
+        <div class="module-metric-copy">
+            <small>当前页失败</small>
+            <strong>{{ history_stats.failed }}</strong>
+            <span>需要回溯和定位的问题</span>
+        </div>
+        <div class="module-metric-spark spark-orange"></div>
+    </article>
+    <article class="module-metric-card metric-purple">
+        <span class="module-metric-icon"><i class="bi bi-exclamation-triangle"></i></span>
+        <div class="module-metric-copy">
+            <small>当前页部分成功</small>
+            <strong>{{ history_stats.partial }}</strong>
+            <span>存在部分步骤异常</span>
+        </div>
+        <div class="module-metric-spark spark-purple"></div>
+    </article>
+</section>
+{% endblock %}
+
+{% block workspace_ai_banner %}
+<section class="module-ai-banner">
+    <div class="module-ai-copy">
+        <div class="module-ai-label">
+            <span>AI 复盘辅助</span>
+            <small>趋势分析</small>
+        </div>
+        <p>快速对比最近多次执行结果，帮助识别不稳定场景和环境问题。</p>
     </div>
-    <div class="card-body">
-        <form method="get" action="{{ url_for('scenario.scenario_execution_history') }}" class="d-flex flex-wrap align-items-center gap-3">
-            <div class="input-group" style="width: auto; min-width: 180px;">
-                <span class="input-group-text bg-light text-muted">场景</span>
-                <select class="form-select" name="scenario_id">
-                    <option value="">全部场景</option>
-                    {% for item in scenarios %}
-                    <option value="{{ item.id }}" {% if selected_scenario_id == item.id %}selected{% endif %}>{{ item.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="input-group" style="width: auto; min-width: 180px;">
-                <span class="input-group-text bg-light text-muted">环境</span>
-                <select class="form-select" name="environment_id">
-                    <option value="">全部环境</option>
-                    {% for env in environments %}
-                    <option value="{{ env.id }}" {% if selected_environment_id == env.id %}selected{% endif %}>{{ env.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="input-group" style="width: auto; min-width: 160px;">
-                <span class="input-group-text bg-light text-muted">状态</span>
-                <select class="form-select" name="status">
-                    <option value="">全部状态</option>
-                    <option value="passed" {% if selected_status == 'passed' %}selected{% endif %}>成功</option>
-                    <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>失败</option>
-                    <option value="partial_success" {% if selected_status == 'partial_success' %}selected{% endif %}>部分成功</option>
-                </select>
-            </div>
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>查询</button>
-                <a class="btn btn-outline-secondary" href="{{ url_for('scenario.scenario_execution_history') }}" title="重置"><i class="bi bi-eraser"></i></a>
+    <div class="module-ai-visual" aria-hidden="true">
+        <div class="module-ai-orb">
+            <i class="bi bi-stars"></i>
+        </div>
+        <div class="module-ai-ring"></div>
+        <div class="module-ai-ring module-ai-ring-2"></div>
+    </div>
+    <a class="btn btn-primary module-ai-btn" href="{{ url_for('scenario.list_scenarios') }}">
+        返回场景
+        <i class="bi bi-arrow-right ms-1"></i>
+    </a>
+</section>
+{% endblock %}
+
+{% block workspace_filter %}
+<section class="card module-filter-card">
+    <div class="card-body module-filter-body">
+        <form method="get" action="{{ url_for('scenario.scenario_execution_history') }}" class="module-filter-form">
+            <div class="module-filter-grid scenario-history-filter-grid">
+                <div class="module-field">
+                    <label class="form-label">项目</label>
+                    <select class="form-select" name="project_id">
+                        <option value="">全部项目</option>
+                        {% for item in projects %}
+                        <option value="{{ item.id }}" {% if selected_project_id == item.id %}selected{% endif %}>{{ item.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">场景</label>
+                    <select class="form-select" name="scenario_id">
+                        <option value="">全部场景</option>
+                        {% for item in scenarios %}
+                        <option value="{{ item.id }}" {% if selected_scenario_id == item.id %}selected{% endif %}>{{ item.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">环境</label>
+                    <select class="form-select" name="environment_id">
+                        <option value="">全部环境</option>
+                        {% for env in environments %}
+                        <option value="{{ env.id }}" {% if selected_environment_id == env.id %}selected{% endif %}>{{ env.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="module-field">
+                    <label class="form-label">状态</label>
+                    <select class="form-select" name="status">
+                        <option value="">全部状态</option>
+                        <option value="passed" {% if selected_status == 'passed' %}selected{% endif %}>成功</option>
+                        <option value="failed" {% if selected_status == 'failed' %}selected{% endif %}>失败</option>
+                        <option value="partial_success" {% if selected_status == 'partial_success' %}selected{% endif %}>部分成功</option>
+                    </select>
+                </div>
+                <div class="module-filter-actions">
+                    <button class="btn btn-primary" type="submit">查询</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('scenario.scenario_execution_history') }}">重置</a>
+                    <button class="btn btn-link module-expand-link" type="button">展开 <i class="bi bi-chevron-down"></i></button>
+                </div>
             </div>
         </form>
     </div>
-</div>
+</section>
+{% endblock %}
 
-<div class="card">
-    <div class="card-header bg-white"><strong>执行记录</strong></div>
+{% block workspace_list %}
+<section class="card module-list-card">
+    <div class="card-header module-list-header">
+        <div>
+            <strong>执行记录</strong>
+            <small>共 {{ history_total }} 条，展示最近执行历史</small>
+        </div>
+        <div class="module-list-tools">
+            <span class="module-chip module-count-chip">当前页 {{ history_page_total }} 条</span>
+        </div>
+    </div>
     <div class="card-body">
         {% if pagination.items %}
-        <div class="table-responsive">
-            <table class="table table-hover table-bordered">
+        <div class="table-responsive module-table-wrap">
+            <table class="table align-middle module-table scenario-history-table">
                 <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>场景名称</th>
-                    <th>项目</th>
-                    <th>环境</th>
-                    <th>状态</th>
-                    <th>总步骤</th>
-                    <th>通过</th>
-                    <th>失败</th>
-                    <th>耗时(ms)</th>
-                    <th>执行时间</th>
-                    <th width="180">操作</th>
+                    <th style="width: 72px;">ID</th>
+                    <th style="width: 220px;">场景名称</th>
+                    <th style="width: 160px;">项目</th>
+                    <th style="width: 180px;">环境</th>
+                    <th style="width: 112px;">触发类型</th>
+                    <th style="width: 120px;">触发人员</th>
+                    <th style="width: 112px;">状态</th>
+                    <th style="width: 92px;">总步骤</th>
+                    <th style="width: 92px;">通过</th>
+                    <th style="width: 92px;">失败</th>
+                    <th style="width: 112px;">耗时(ms)</th>
+                    <th style="width: 168px;">执行时间</th>
+                    <th style="width: 200px;">操作</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for item in pagination.items %}
                 <tr>
-                    <td>{{ item.id }}</td>
-                    <td>{{ item.scenario.name }}</td>
-                    <td>{{ item.scenario.project.name }}</td>
-                    <td>{{ item.environment.name if item.environment else '-' }}</td>
+                    <td class="module-id-cell">{{ item.id }}</td>
                     <td>
-                        {% if item.status == 'passed' %}
-                        <span class="badge bg-success">成功</span>
-                        {% elif item.status == 'partial_success' %}
-                        <span class="badge bg-warning text-dark">部分成功</span>
-                        {% elif item.status == 'failed' %}
-                        <span class="badge bg-danger">失败</span>
+                        <div class="module-name-cell">
+                            <span class="module-row-icon icon-{{ loop.index0 % 4 }}"><i class="bi bi-play-circle"></i></span>
+                            <div>
+                                <strong>{{ item.scenario.name }}</strong>
+                                <small>RUN-{{ '%03d' | format(item.id) }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="module-chip module-project-chip"><i class="bi bi-folder2"></i>{{ item.scenario.project.name }}</span></td>
+                    <td>
+                        {% if item.environment %}
+                        <span class="module-chip module-project-chip"><i class="bi bi-hdd-network"></i>{{ item.environment.name }}</span>
                         {% else %}
-                        <span class="badge bg-secondary">{{ item.status }}</span>
+                        <span class="module-chip module-count-chip">-</span>
                         {% endif %}
                     </td>
-                    <td>{{ item.total_steps }}</td>
-                    <td>{{ item.passed_steps }}</td>
-                    <td>{{ item.failed_steps }}</td>
-                    <td>{{ item.duration_ms }}</td>
-                    <td>{{ (item.started_at or item.created_at) | bjt }}</td>
-                    <td class="d-flex gap-2">
-                        {% if has_permission('scenario:view') %}
-                        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('scenario.scenario_execution_detail', scenario_execution_id=item.id) }}"><i class="bi bi-file-text me-1"></i>详情</a>
+                    <td><span class="module-chip module-count-chip">{{ item.trigger_type_label }}</span></td>
+                    <td>{{ item.trigger_person_name }}</td>
+                    <td>
+                        {% if item.status == 'passed' %}
+                        <span class="module-status-chip status-active"><i class="bi bi-dot"></i>成功</span>
+                        {% elif item.status == 'partial_success' %}
+                        <span class="module-status-chip status-pending"><i class="bi bi-dot"></i>部分成功</span>
+                        {% elif item.status == 'failed' %}
+                        <span class="module-status-chip status-muted"><i class="bi bi-dot"></i>失败</span>
+                        {% else %}
+                        <span class="module-status-chip status-muted"><i class="bi bi-dot"></i>{{ item.status }}</span>
                         {% endif %}
-                        {% if has_permission('scenario:run') %}
-                        <form method="post" action="{{ url_for('scenario.rerun_scenario_execution', scenario_execution_id=item.id) }}">
-                            <input type="hidden" name="persist_extracted_to_environment" value="0">
-                            <button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-play-fill me-1"></i>重跑</button>
-                        </form>
-                        {% endif %}
+                    </td>
+                    <td><span class="module-chip module-count-chip">{{ item.total_steps }}</span></td>
+                    <td><span class="module-chip module-count-chip">{{ item.passed_steps }}</span></td>
+                    <td><span class="module-chip module-count-chip">{{ item.failed_steps }}</span></td>
+                    <td class="module-time-cell">{{ item.duration_ms }}</td>
+                    <td class="module-time-cell">{{ (item.started_at or item.created_at) | bjt }}</td>
+                    <td>
+                        <div class="module-row-actions">
+                            {% if has_permission('scenario:view') %}
+                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('scenario.scenario_execution_detail', scenario_execution_id=item.id) }}">详情</a>
+                            {% endif %}
+                            {% if has_permission('scenario:run') %}
+                            <form method="post" action="{{ url_for('scenario.rerun_scenario_execution', scenario_execution_id=item.id) }}">
+                                <input type="hidden" name="persist_extracted_to_environment" value="0">
+                                <button class="btn btn-sm btn-outline-success" type="submit">重跑</button>
+                            </form>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -109,35 +241,106 @@
         </div>
 
         {% if pagination.pages > 1 %}
-        <nav aria-label="Page navigation" class="mt-4">
-            <ul class="pagination justify-content-center mb-0">
-                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('scenario.scenario_execution_history', page=pagination.prev_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}" aria-label="Previous">
-                        <span aria-hidden="true">&laquo;</span>
-                    </a>
-                </li>
-                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                    {% if page_num %}
-                        {% if pagination.page == page_num %}
-                            <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
-                        {% else %}
-                            <li class="page-item"><a class="page-link" href="{{ url_for('scenario.scenario_execution_history', page=page_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}">{{ page_num }}</a></li>
-                        {% endif %}
-                    {% else %}
-                        <li class="page-item disabled"><span class="page-link">...</span></li>
-                    {% endif %}
-                {% endfor %}
-                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('scenario.scenario_execution_history', page=pagination.next_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}" aria-label="Next">
-                        <span aria-hidden="true">&raquo;</span>
-                    </a>
-                </li>
-            </ul>
-        </nav>
+        <div class="module-pagination">
+            <div class="module-pagination-info">第 {{ pagination.page }} / {{ pagination.pages }} 页</div>
+            <div class="module-pagination-controls">
+                <a class="btn btn-outline-secondary btn-sm {% if not pagination.has_prev %}disabled{% endif %}" href="{{ url_for('scenario.scenario_execution_history', page=pagination.prev_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}"><i class="bi bi-chevron-left"></i></a>
+                <span class="btn btn-primary btn-sm">{{ pagination.page }}</span>
+                <a class="btn btn-outline-secondary btn-sm {% if not pagination.has_next %}disabled{% endif %}" href="{{ url_for('scenario.scenario_execution_history', page=pagination.next_num, project_id=request.args.get('project_id'), scenario_id=request.args.get('scenario_id'), environment_id=request.args.get('environment_id'), status=request.args.get('status')) }}"><i class="bi bi-chevron-right"></i></a>
+                <span>前往</span>
+                <input type="text" value="{{ pagination.page }}" aria-label="页码">
+                <span>页</span>
+            </div>
+        </div>
         {% endif %}
         {% else %}
-        <div class="empty-box">暂无场景执行历史</div>
+        <div class="module-empty-state">
+            <span><i class="bi bi-clock-history"></i></span>
+            <strong>暂无场景执行历史</strong>
+            <p>执行场景后，这里会持续记录每一次回归运行结果。</p>
+        </div>
         {% endif %}
     </div>
-</div>
+</section>
+{% endblock %}
+
+{% block workspace_rail %}
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>最近动态</strong>
+        <a href="{{ url_for('scenario.list_scenarios') }}">查看场景</a>
+    </div>
+    <div class="card-body module-side-body">
+        {% if pagination.items %}
+        <div class="module-activity-list">
+            {% for item in pagination.items[:4] %}
+            <div class="module-activity-item">
+                <span class="module-activity-icon icon-{{ loop.index0 % 4 }}">
+                    <i class="bi bi-play-circle"></i>
+                </span>
+                <div class="module-activity-copy">
+                    <strong>{{ item.scenario.name }} · {{ item.status }}</strong>
+                    <small>{{ (item.started_at or item.created_at) | bjt }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="module-rail-empty">暂无动态</div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>快捷入口</strong>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-quick-grid">
+            <a class="module-quick-item" href="{{ url_for('scenario.list_scenarios') }}">
+                <i class="bi bi-diagram-3"></i>
+                <span>场景列表</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('scenario.edit_scenario_page', scenario_id=selected_scenario_id) if selected_scenario_id else url_for('scenario.list_scenarios') }}">
+                <i class="bi bi-gear"></i>
+                <span>场景编辑</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('environment.list_environments') }}">
+                <i class="bi bi-hdd-network"></i>
+                <span>环境管理</span>
+            </a>
+            <a class="module-quick-item" href="{{ url_for('module.list_modules') }}">
+                <i class="bi bi-box"></i>
+                <span>模块管理</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="card module-side-card">
+    <div class="card-header module-side-header">
+        <strong>AI 推荐</strong>
+        <button class="module-side-refresh" type="button">换一换</button>
+    </div>
+    <div class="card-body module-side-body">
+        <div class="module-insight-list">
+            <a class="module-insight-item" href="{{ url_for('scenario.list_scenarios') }}">
+                <span class="module-insight-icon icon-0"><i class="bi bi-lightning-charge"></i></span>
+                <div>
+                    <strong>识别不稳定的场景</strong>
+                    <small>根据最近失败记录优化回归链路</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+            <a class="module-insight-item" href="{{ url_for('scenario.scenario_execution_history', status='failed') }}">
+                <span class="module-insight-icon icon-1"><i class="bi bi-exclamation-triangle"></i></span>
+                <div>
+                    <strong>查看失败执行</strong>
+                    <small>快速定位需要复盘的记录</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</section>
 {% endblock %}
