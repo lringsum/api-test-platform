@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color: #11204a; background: #f6faff; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; overflow: hidden; }
+body { min-width: 320px; margin: 0; background: #f6faff; }
+button, input, textarea { font: inherit; }
+.anticon { display: inline-flex; align-items: center; justify-content: center; line-height: 1; vertical-align: middle; }
+.anticon > svg { display: block; }
+.ant-avatar { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.ant-avatar .anticon { display: flex; }
+.ant-btn > .anticon, .ant-menu-item .anticon, .ant-menu-submenu-title .anticon, .ant-input-prefix .anticon, .ant-tag .anticon, .ant-alert-icon { align-items: center; justify-content: center; }
+.ant-btn-primary { box-shadow: none; }
+.ant-table-wrapper .ant-table { background: transparent; }
+.ant-table-wrapper .ant-table-thead > tr > th { color: #48607f; font-weight: 500; background: #f7faff; border-bottom: 1px solid #e1ebfa; }
+.ant-table-wrapper .ant-table-tbody > tr > td { color: #243757; border-bottom-color: #e8effa; }
+.ant-table-wrapper .ant-table-tbody > tr:hover > td { background: #f8fbff !important; }
+.app-workspace { isolation: isolate; }
+.app-workspace .ant-table-wrapper { max-height: calc(100vh - 280px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.app-workspace .ant-table-wrapper .ant-table-thead > tr > th { position: sticky; top: 0; z-index: 2; }
+.app-workspace .ant-table-wrapper .ant-table-thead > tr > th::before { z-index: 3; }
+.qa-panel { border: 1px solid #e1ebfa; border-radius: 16px; background: rgba(255,255,255,.94); box-shadow: 0 12px 40px rgba(33,79,147,.04); }
+.ant-select-selector, .ant-input-affix-wrapper, .ant-input { border-color: #dbe6f6 !important; box-shadow: none !important; }
+.ant-select-focused .ant-select-selector, .ant-input-affix-wrapper-focused, .ant-input:focus { border-color: #1769f0 !important; }
+@media (max-width: 768px) { html, body, #app { height: auto; overflow: auto; } .app-workspace { overflow: visible !important; } .app-workspace .ant-table-wrapper { max-height: none; overflow-x: auto; } }

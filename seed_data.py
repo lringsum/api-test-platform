@@ -1,5 +1,5 @@
 from app import create_app, db
-from app.models import Environment, Module, Project, PromptTemplate, TestCase, Variable
+from app.models import Environment, Module, Project, TestCase, Variable
 
 
 app = create_app()
@@ -75,24 +75,6 @@ def seed():
             ),
         ]
         db.session.add_all(variables)
-
-        prompt = PromptTemplate(
-            name="默认接口解析模板",
-            description="默认 AI 解析模板",
-            is_active=True,
-            content=(
-                "请根据以下接口文档生成标准接口测试用例 JSON。\n"
-                "要求：\n"
-                "1. 必须输出 JSON 对象\n"
-                "2. 必须包含字段：name, method, url, headers, params, body, extract, assertions\n"
-                "3. method 仅允许 GET 或 POST\n"
-                "4. assertions 至少包含 status_code\n"
-                "5. 如果响应中包含 code 字段，补充 json_path 断言\n"
-                "接口文档如下：\n"
-                "{{document}}"
-            ),
-        )
-        db.session.add(prompt)
 
         login_case = TestCase(
             project_id=project.id,

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import importlib.util
+import ast
 import json
 import mimetypes
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
-from datetime import datetime
+import ctypes
+from datetime import UTC, datetime
 from pathlib import Path
 from textwrap import dedent
 
@@ -20,6 +23,7 @@ from app.models import (
     UiAutomationEnvironment,
     UiAutomationRunStep,
     UiAutomationRun,
+    UiAutomationScript,
     UiAutomationScriptVersion,
 )
 from app.services.base_service import ServiceError
@@ -32,12 +36,132 @@ class UiAutomationWorker:
         "playwright": "playwright",
         "pytest_playwright": "pytest-playwright",
     }
+    PASSED_RUN_DROP_ARTIFACT_TYPES = {"trace", "video"}
 
     @staticmethod
     def workspace_root():
         root = Path(current_app.instance_path) / "ui_automation" / "runs"
         root.mkdir(parents=True, exist_ok=True)
         return root.resolve()
+
+    @staticmethod
+    def worker_runtime_root():
+        root = Path(current_app.instance_path) / "ui_automation" / "worker"
+        root.mkdir(parents=True, exist_ok=True)
+        return root.resolve()
+
+    @staticmethod
+    def worker_status_path():
+        return UiAutomationWorker.worker_runtime_root() / "status.json"
+
+    @staticmethod
+    def worker_lock_path():
+        return UiAutomationWorker.worker_runtime_root() / "worker.lock"
+
+    @staticmethod
+    def _utc_now():
+        return datetime.now(UTC).replace(tzinfo=None)
+
+    @staticmethod
+    def _to_isoformat(value):
+        if not value:
+            return ""
+        return value.isoformat()
+
+    @staticmethod
+    def _parse_datetime(value):
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _seconds_since(value, now=None):
+        parsed = UiAutomationWorker._parse_datetime(value)
+        if not parsed:
+            return None
+        current = now or UiAutomationWorker._utc_now()
+        return max(0.0, (current - parsed).total_seconds())
+
+    @staticmethod
+    def is_pid_running(pid):
+        try:
+            normalized_pid = int(pid or 0)
+        except (TypeError, ValueError):
+            return False
+        if normalized_pid <= 0:
+            return False
+        if os.name == "nt":
+            process_query_limited_information = 0x1000
+            handle = ctypes.windll.kernel32.OpenProcess(
+                process_query_limited_information,
+                False,
+                normalized_pid,
+            )
+            if not handle:
+                return False
+            ctypes.windll.kernel32.CloseHandle(handle)
+            return True
+        try:
+            os.kill(normalized_pid, 0)
+        except OSError:
+            return False
+        return True
+
+    @staticmethod
+    def load_worker_status():
+        path = UiAutomationWorker.worker_status_path()
+        if not path.is_file():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    @staticmethod
+    def write_worker_status(payload):
+        path = UiAutomationWorker.worker_status_path()
+        normalized = dict(payload or {})
+        normalized.setdefault("updated_at", UiAutomationWorker._to_isoformat(UiAutomationWorker._utc_now()))
+        temp_path = path.with_suffix(".tmp")
+        temp_path.write_text(
+            json.dumps(normalized, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        temp_path.replace(path)
+
+    @staticmethod
+    def get_worker_health():
+        status = UiAutomationWorker.load_worker_status()
+        now = UiAutomationWorker._utc_now()
+        stale_seconds = int(
+            current_app.config.get("UI_AUTOMATION_WORKER_STALE_SECONDS", 30)
+        )
+        heartbeat_age = UiAutomationWorker._seconds_since(
+            status.get("last_heartbeat_at"),
+            now=now,
+        )
+        pid_alive = UiAutomationWorker.is_pid_running(status.get("pid"))
+        online = bool(status) and bool(pid_alive) and heartbeat_age is not None and heartbeat_age <= stale_seconds
+        return {
+            "online": online,
+            "pid_alive": pid_alive,
+            "state": str(status.get("state") or "offline"),
+            "pid": status.get("pid"),
+            "current_run_id": status.get("current_run_id"),
+            "last_heartbeat_at": status.get("last_heartbeat_at", ""),
+            "heartbeat_age_seconds": heartbeat_age,
+            "stale_seconds": stale_seconds,
+            "python_executable": status.get("python_executable", ""),
+        }
 
     @staticmethod
     def get_run(run_id):
@@ -52,6 +176,14 @@ class UiAutomationWorker:
             UiAutomationRun.query.filter_by(status="queued")
             .order_by(UiAutomationRun.created_at.asc(), UiAutomationRun.id.asc())
             .first()
+        )
+
+    @staticmethod
+    def list_running_runs():
+        return (
+            UiAutomationRun.query.filter_by(status="running")
+            .order_by(UiAutomationRun.started_at.asc(), UiAutomationRun.id.asc())
+            .all()
         )
 
     @staticmethod
@@ -83,8 +215,63 @@ class UiAutomationWorker:
 
         script_path = workspace / "test_script.py"
         script_path.write_text(version.script_content, encoding="utf-8")
-        UiAutomationWorker._write_runtime_config(run, workspace)
+        preconditions = UiAutomationWorker._materialize_preconditions(version, workspace)
+        UiAutomationWorker._write_runtime_config(run, workspace, preconditions)
         return workspace, output_dir, script_path
+
+    @staticmethod
+    def _infer_precondition_entrypoint(script_content):
+        try:
+            tree = ast.parse(script_content or "")
+        except SyntaxError as exc:
+            raise ServiceError(f"登录前置脚本语法错误：{exc}") from exc
+        candidates = [
+            node.name for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name.startswith("test_")
+        ]
+        if not candidates:
+            raise ServiceError("登录前置脚本缺少可调用的 test_ 函数。")
+        return candidates[0]
+
+    @staticmethod
+    def _materialize_preconditions(version, workspace):
+        preconditions = []
+        for dependency in version.dependencies or []:
+            if not isinstance(dependency, dict):
+                continue
+            if dependency.get("role") != "login_precondition":
+                continue
+            try:
+                script_id = int(dependency.get("script_id"))
+            except (TypeError, ValueError):
+                raise ServiceError("登录前置脚本依赖配置不合法。")
+            script = db.session.get(UiAutomationScript, script_id)
+            target_script = db.session.get(UiAutomationScript, version.script_id)
+            if (
+                not script
+                or not target_script
+                or script.project_id != target_script.project_id
+            ):
+                raise ServiceError("登录前置脚本不存在或不属于当前项目。")
+            dependency_version = UiAutomationService._get_latest_script_version(script)
+            if not dependency_version:
+                raise ServiceError("登录前置脚本缺少可执行版本。")
+            module_name = f"ui_precondition_{script.id}"
+            module_path = workspace / f"{module_name}.py"
+            module_path.write_text(dependency_version.script_content, encoding="utf-8")
+            preconditions.append(
+                {
+                    "module": module_name,
+                    "entrypoint": UiAutomationWorker._infer_precondition_entrypoint(
+                        dependency_version.script_content
+                    ),
+                    "script_id": script.id,
+                    "script_code": script.code,
+                    "version": dependency_version.version_no,
+                }
+            )
+        return preconditions
 
     @staticmethod
     def _find_chromium_executable():
@@ -96,7 +283,7 @@ class UiAutomationWorker:
         return candidates[0] if candidates else None
 
     @staticmethod
-    def _write_runtime_config(run, workspace):
+    def _write_runtime_config(run, workspace, preconditions=None):
         environment = (
             db.session.get(UiAutomationEnvironment, run.environment_id)
             if run.environment_id
@@ -112,10 +299,16 @@ class UiAutomationWorker:
             "width": environment.viewport_width if environment else 1440,
             "height": environment.viewport_height if environment else 900,
         }
-        config_content = "\n".join(
-            [
+        config_lines = [
                 "import pytest",
                 "from ui_step_recorder import install_recorder",
+        ]
+        for index, item in enumerate(preconditions or []):
+            config_lines.append(
+                f"from {item['module']} import {item['entrypoint']} as _platform_precondition_{index}"
+            )
+        config_lines.extend(
+            [
                 "",
                 "install_recorder()",
                 "",
@@ -131,6 +324,18 @@ class UiAutomationWorker:
                 "",
             ]
         )
+        if preconditions:
+            config_lines.extend(
+                [
+                    "",
+                    "@pytest.fixture(autouse=True)",
+                    "def platform_login_precondition(page, base_url):",
+                ]
+            )
+            for index, _item in enumerate(preconditions):
+                config_lines.append(f"    _platform_precondition_{index}(page, base_url)")
+            config_lines.append("")
+        config_content = "\n".join(config_lines)
         (workspace / "conftest.py").write_text(config_content, encoding="utf-8")
         (workspace / "ui_step_recorder.py").write_text(
             UiAutomationWorker._runtime_recorder_source(),
@@ -146,6 +351,7 @@ class UiAutomationWorker:
             import os
             import threading
             import time
+            from contextlib import contextmanager
             from datetime import datetime, timezone
             from pathlib import Path
 
@@ -155,6 +361,7 @@ class UiAutomationWorker:
             _LOCK = threading.Lock()
             _SEQUENCE = 0
             _INSTALLED = False
+            _STEP_LOCAL = threading.local()
             _OUTPUT_PATH = Path(os.environ.get("UI_AUTOMATION_STEP_FILE", "runtime-steps.jsonl"))
             _SCREENSHOT_ROOT = Path(
                 os.environ.get("UI_AUTOMATION_STEP_SCREENSHOT_DIR", "step_screenshots")
@@ -267,14 +474,47 @@ class UiAutomationWorker:
                 return value
 
 
-            def _record(payload):
+            def _record(payload, reuse_sequence=False):
                 global _SEQUENCE
                 with _LOCK:
-                    _SEQUENCE += 1
-                    payload["sequence"] = _SEQUENCE
+                    if not reuse_sequence:
+                        _SEQUENCE += 1
+                        payload["sequence"] = _SEQUENCE
                     _OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
                     with _OUTPUT_PATH.open("a", encoding="utf-8") as handle:
                         handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
+                        handle.flush()
+
+
+            def _step_stack():
+                stack = getattr(_STEP_LOCAL, "stack", None)
+                if stack is None:
+                    stack = []
+                    _STEP_LOCAL.stack = stack
+                return stack
+
+
+            def _current_step_meta():
+                stack = _step_stack()
+                return stack[-1] if stack else {}
+
+
+            @contextmanager
+            def step(title, step_type=None, input_value=None, expected_value=None, locator=None):
+                stack = _step_stack()
+                stack.append(
+                    {
+                        "title": _safe_text(title, limit=200),
+                        "step_type": _safe_text(step_type, limit=50),
+                        "input_value": _safe_text(input_value),
+                        "expected_value": _safe_text(expected_value),
+                        "locator": _safe_text(locator),
+                    }
+                )
+                try:
+                    yield
+                finally:
+                    stack.pop()
 
 
             def _wrap_method(owner, method_name, step_type, title, assertion=False):
@@ -297,25 +537,34 @@ class UiAutomationWorker:
                     }:
                         input_value = _safe_text(args[0]) if args else ""
                     input_value = _mask_value(locator, input_value, method_name)
+                    meta = _current_step_meta()
+                    custom_title = str(meta.get("title") or "").strip()
+                    custom_step_type = str(meta.get("step_type") or "").strip()
+                    custom_input_value = str(meta.get("input_value") or "").strip()
+                    custom_expected_value = str(meta.get("expected_value") or "").strip()
+                    custom_locator = str(meta.get("locator") or "").strip()
+                    custom_input_value = _mask_value(locator, custom_input_value, method_name)
 
                     payload = {
                         "source": "runtime",
                         "attempt": int(os.environ.get("UI_AUTOMATION_ATTEMPT", "1")),
-                        "step_type": step_type,
-                        "step_title": title,
+                        "step_type": custom_step_type or step_type,
+                        "step_title": custom_title or title,
                         "method": method_name,
-                        "locator": locator,
-                        "input_value": input_value,
-                        "expected_value": expected_value,
-                        "status": "passed",
+                        "locator": custom_locator or locator,
+                        "input_value": custom_input_value or input_value,
+                        "expected_value": custom_expected_value or expected_value,
+                        "status": "running",
                         "duration_ms": 0,
                         "error_message": "",
                         "started_at": datetime.now(timezone.utc).isoformat(),
                         "sequence_hint": 0,
                         "screenshot_file": "",
                     }
+                    _record(payload)
                     try:
                         result = original(self, *args, **kwargs)
+                        payload["status"] = "passed"
                     except BaseException as exc:
                         payload["status"] = "failed"
                         payload["error_message"] = _safe_text(exc, limit=4000)
@@ -328,7 +577,7 @@ class UiAutomationWorker:
                             1,
                             int((time.perf_counter() - started) * 1000),
                         )
-                        _record(payload)
+                        _record(payload, reuse_sequence=True)
                     return result
 
                 wrapped._ui_step_wrapped = True
@@ -396,6 +645,39 @@ class UiAutomationWorker:
         return command
 
     @staticmethod
+    def _resolve_run_timeout_seconds(run):
+        summary = dict(run.summary or {})
+        configured_timeout = summary.get("configured_timeout_seconds")
+        if configured_timeout not in (None, ""):
+            try:
+                timeout_seconds = int(configured_timeout)
+            except (TypeError, ValueError):
+                timeout_seconds = None
+            if timeout_seconds is not None and 30 <= timeout_seconds <= 3600:
+                return timeout_seconds, "run"
+
+        environment = (
+            db.session.get(UiAutomationEnvironment, run.environment_id)
+            if run.environment_id
+            else None
+        )
+        runtime_variables = (
+            (environment.runtime_variables or {})
+            if environment
+            else {}
+        )
+        env_timeout = runtime_variables.get("UI_AUTOMATION_RUN_TIMEOUT")
+        if env_timeout not in (None, ""):
+            try:
+                timeout_seconds = int(env_timeout)
+            except (TypeError, ValueError):
+                timeout_seconds = None
+            if timeout_seconds is not None and 30 <= timeout_seconds <= 3600:
+                return timeout_seconds, "environment"
+
+        return int(current_app.config.get("UI_AUTOMATION_RUN_TIMEOUT", 300)), "config"
+
+    @staticmethod
     def _artifact_type(path):
         name = path.name.lower()
         suffix = path.suffix.lower()
@@ -418,6 +700,34 @@ class UiAutomationWorker:
         return "file"
 
     @staticmethod
+    def _remove_empty_parent_dirs(root, path):
+        current = path.parent
+        while current != root and current.exists():
+            try:
+                current.rmdir()
+            except OSError:
+                break
+            current = current.parent
+
+    @staticmethod
+    def _prune_workspace_artifacts(workspace, artifact_types):
+        normalized_types = {str(item or "").strip().lower() for item in artifact_types or set()}
+        if not workspace or not workspace.exists() or not normalized_types:
+            return []
+
+        removed = []
+        for path in sorted(item for item in workspace.rglob("*") if item.is_file()):
+            if ".pytest_cache" in path.parts or "__pycache__" in path.parts:
+                continue
+            artifact_type = UiAutomationWorker._artifact_type(path)
+            if artifact_type not in normalized_types:
+                continue
+            path.unlink(missing_ok=True)
+            removed.append(path)
+            UiAutomationWorker._remove_empty_parent_dirs(workspace, path)
+        return removed
+
+    @staticmethod
     def _register_artifacts(run, workspace):
         UiAutomationArtifact.query.filter_by(run_id=run.id).delete()
         for path in sorted(item for item in workspace.rglob("*") if item.is_file()):
@@ -433,6 +743,38 @@ class UiAutomationWorker:
                 mime_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream",
             )
             db.session.add(artifact)
+
+    @staticmethod
+    def _delete_run_artifact_records(run_id):
+        UiAutomationArtifact.query.filter_by(run_id=run_id).delete()
+
+    @staticmethod
+    def _cleanup_old_run_workspaces():
+        runs = UiAutomationRun.query.order_by(
+            UiAutomationRun.project_id.asc(),
+            UiAutomationRun.id.desc(),
+        ).all()
+
+        kept_counts = {}
+        stale_runs = []
+        for run in runs:
+            project_id = getattr(run, "project_id", None)
+            keep_latest = UiAutomationService.get_artifact_keep_latest_runs(project_id)
+            kept_count = kept_counts.get(project_id, 0)
+            if kept_count < keep_latest:
+                kept_counts[project_id] = kept_count + 1
+                continue
+            stale_runs.append(run)
+
+        removed_run_ids = []
+        workspace_root = UiAutomationWorker.workspace_root()
+        for stale_run in stale_runs:
+            workspace = workspace_root / str(stale_run.id)
+            if workspace.exists():
+                shutil.rmtree(workspace, ignore_errors=True)
+            UiAutomationWorker._delete_run_artifact_records(stale_run.id)
+            removed_run_ids.append(stale_run.id)
+        return removed_run_ids
 
     @staticmethod
     def _summarize_step_title(step_type, source_line):
@@ -542,16 +884,20 @@ class UiAutomationWorker:
         if not step_path.is_file():
             return []
 
-        steps = []
+        steps_by_key = {}
         for line in step_path.read_text(encoding="utf-8", errors="replace").splitlines():
             try:
                 payload = json.loads(line)
             except (TypeError, ValueError):
                 continue
             if isinstance(payload, dict):
-                steps.append(payload)
+                key = (
+                    int(payload.get("attempt") or 1),
+                    int(payload.get("sequence") or 0),
+                )
+                steps_by_key[key] = payload
         return sorted(
-            steps,
+            steps_by_key.values(),
             key=lambda item: (
                 int(item.get("attempt") or 1),
                 int(item.get("sequence") or 0),
@@ -559,11 +905,46 @@ class UiAutomationWorker:
         )
 
     @staticmethod
+    def _sync_runtime_steps(run, runtime_steps, delete_stale=False, commit=True):
+        templates = list(runtime_steps or [])
+        existing_steps = {
+            item.step_index: item
+            for item in UiAutomationRunStep.query.filter_by(run_id=run.id).all()
+        }
+        retained_indexes = set()
+        for index, template in enumerate(templates, start=1):
+            retained_indexes.add(index)
+            step = existing_steps.get(index)
+            if step is None:
+                step = UiAutomationRunStep(run_id=run.id, step_index=index)
+                db.session.add(step)
+            step.step_type = str(template.get("step_type") or "step")[:30]
+            step.step_title = str(template.get("step_title") or f"步骤 {index}")[:150]
+            step.locator = str(template.get("locator") or "")
+            step.input_value = str(template.get("input_value") or "")
+            step.expected_value = str(template.get("expected_value") or "")
+            step.status = str(template.get("status") or "running")[:20]
+            step.duration_ms = max(0, int(template.get("duration_ms") or 0))
+            step.error_message = str(template.get("error_message") or "")[:4000]
+            step.raw_log = template.get("raw_log") or [template]
+
+        if delete_stale:
+            for index, step in existing_steps.items():
+                if index not in retained_indexes:
+                    db.session.delete(step)
+        if commit:
+            db.session.commit()
+        else:
+            db.session.flush()
+        return len(templates)
+
+    @staticmethod
     def _persist_collected_run_steps(run, script_content, runtime_steps):
-        UiAutomationRunStep.query.filter_by(run_id=run.id).delete()
-        step_templates = list(runtime_steps) or UiAutomationWorker._synthesize_run_steps(script_content)
-        if runtime_steps and run.status in {"failed", "timeout"}:
-            if not any(item.get("status") == "failed" for item in step_templates):
+        if runtime_steps:
+            step_templates = list(runtime_steps)
+            if run.status in {"failed", "timeout"} and not any(
+                item.get("status") == "failed" for item in step_templates
+            ):
                 step_templates.append(
                     {
                         "attempt": int(run.retry_count or 0) + 1,
@@ -571,13 +952,20 @@ class UiAutomationWorker:
                         "step_title": "执行任务结束",
                         "method": "pytest",
                         "locator": "worker",
-                        "input_value": "",
-                        "expected_value": "",
                         "status": "failed",
-                        "duration_ms": 0,
                         "error_message": run.error_message or "执行任务失败。",
                     }
                 )
+            UiAutomationWorker._sync_runtime_steps(
+                run,
+                step_templates,
+                delete_stale=True,
+                commit=False,
+            )
+            return
+
+        UiAutomationRunStep.query.filter_by(run_id=run.id).delete()
+        step_templates = UiAutomationWorker._synthesize_run_steps(script_content)
         total_steps = len(step_templates)
         duration_total = max(int(run.duration_ms or 0), total_steps * 100)
         base_duration = duration_total // total_steps if total_steps else 0
@@ -618,6 +1006,94 @@ class UiAutomationWorker:
             db.session.add(step)
 
     @staticmethod
+    def _has_process_timed_out(
+        started_at,
+        last_progress_at,
+        timeout_seconds,
+        extend_on_progress,
+        now,
+    ):
+        timeout_reference = last_progress_at if extend_on_progress else started_at
+        return now - timeout_reference >= timeout_seconds
+
+    @staticmethod
+    def _run_observable_process(
+        command,
+        workspace,
+        env,
+        timeout_seconds,
+        run,
+        extend_on_progress=False,
+    ):
+        with tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace") as stdout_file, tempfile.TemporaryFile(
+            mode="w+", encoding="utf-8", errors="replace"
+        ) as stderr_file:
+            process = subprocess.Popen(
+                command,
+                cwd=workspace,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+            started = time.perf_counter()
+            last_progress_at = started
+            last_step_signature = None
+            while True:
+                runtime_steps = UiAutomationWorker._load_runtime_steps(workspace)
+                step_signature = tuple(
+                    (
+                        int(item.get("attempt") or 1),
+                        int(item.get("sequence") or 0),
+                        str(item.get("status") or ""),
+                        int(item.get("duration_ms") or 0),
+                    )
+                    for item in runtime_steps
+                )
+                if step_signature != last_step_signature:
+                    UiAutomationWorker._sync_runtime_steps(run, runtime_steps)
+                    last_step_signature = step_signature
+                    if runtime_steps:
+                        last_progress_at = time.perf_counter()
+
+                return_code = process.poll()
+                if return_code is not None:
+                    stdout_file.seek(0)
+                    stderr_file.seek(0)
+                    final_steps = UiAutomationWorker._load_runtime_steps(workspace)
+                    UiAutomationWorker._sync_runtime_steps(run, final_steps)
+                    return subprocess.CompletedProcess(
+                        command,
+                        return_code,
+                        stdout=stdout_file.read(),
+                        stderr=stderr_file.read(),
+                    )
+
+                now = time.perf_counter()
+                if UiAutomationWorker._has_process_timed_out(
+                    started,
+                    last_progress_at,
+                    timeout_seconds,
+                    extend_on_progress,
+                    now,
+                ):
+                    process.kill()
+                    process.wait()
+                    stdout_file.seek(0)
+                    stderr_file.seek(0)
+                    final_steps = UiAutomationWorker._load_runtime_steps(workspace)
+                    UiAutomationWorker._sync_runtime_steps(run, final_steps)
+                    raise subprocess.TimeoutExpired(
+                        command,
+                        timeout_seconds,
+                        output=stdout_file.read(),
+                        stderr=stderr_file.read(),
+                    )
+                time.sleep(0.5)
+
+    @staticmethod
     def resolve_artifact_path(artifact):
         root = UiAutomationWorker.workspace_root()
         target = (root / artifact.file_path).resolve()
@@ -626,6 +1102,63 @@ class UiAutomationWorker:
         if not target.is_file():
             raise ServiceError("执行产物文件不存在。")
         return target
+
+    @staticmethod
+    def _run_last_activity_at(run):
+        workspace = UiAutomationWorker.workspace_root() / str(run.id)
+        step_path = workspace / "runtime-steps.jsonl"
+        if step_path.is_file():
+            return datetime.fromtimestamp(step_path.stat().st_mtime, UTC).replace(tzinfo=None)
+        if workspace.exists():
+            return datetime.fromtimestamp(workspace.stat().st_mtime, UTC).replace(tzinfo=None)
+        return UiAutomationWorker._parse_datetime(getattr(run, "started_at", None))
+
+    @staticmethod
+    def _should_recover_run(run, worker_health=None, now=None):
+        current = now or UiAutomationWorker._utc_now()
+        health = worker_health or {}
+        if health.get("online"):
+            return False
+        stale_seconds = int(
+            current_app.config.get("UI_AUTOMATION_RUN_STALE_SECONDS", 90)
+        )
+        last_activity = UiAutomationWorker._run_last_activity_at(run)
+        if not last_activity:
+            return False
+        idle_seconds = max(0.0, (current - last_activity).total_seconds())
+        return idle_seconds >= stale_seconds
+
+    @staticmethod
+    def recover_stale_runs():
+        worker_health = UiAutomationWorker.get_worker_health()
+        if worker_health.get("online"):
+            return []
+
+        now = UiAutomationWorker._utc_now()
+        recovered_ids = []
+        runs = UiAutomationWorker.list_running_runs()
+        for run in runs:
+            if not UiAutomationWorker._should_recover_run(
+                run,
+                worker_health=worker_health,
+                now=now,
+            ):
+                continue
+            run.status = "failed"
+            run.error_stage = "worker"
+            run.finished_at = now
+            run.error_message = "Worker heartbeat lost; recovered stale running task."
+            summary = dict(run.summary or {})
+            summary["worker_status"] = "failed"
+            summary["worker_recovered"] = True
+            summary["worker_recovered_at"] = UiAutomationWorker._to_isoformat(now)
+            summary["worker_recovery_reason"] = "stale_running_task"
+            run.summary = summary
+            recovered_ids.append(run.id)
+
+        if recovered_ids:
+            db.session.commit()
+        return recovered_ids
 
     @staticmethod
     def execute_run(run_id):
@@ -639,7 +1172,7 @@ class UiAutomationWorker:
         version = None
         started = time.perf_counter()
         run.status = "running"
-        run.started_at = datetime.utcnow()
+        run.started_at = UiAutomationWorker._utc_now()
         run.finished_at = None
         run.duration_ms = 0
         run.retry_count = 0
@@ -652,9 +1185,17 @@ class UiAutomationWorker:
             workspace, output_dir, script_path = UiAutomationWorker._prepare_workspace(run)
             version = db.session.get(UiAutomationScriptVersion, run.script_version_id)
             command = UiAutomationWorker._build_command(run, output_dir, script_path)
-            timeout_seconds = int(
-                current_app.config.get("UI_AUTOMATION_RUN_TIMEOUT", 300)
+            timeout_seconds, timeout_source = (
+                UiAutomationWorker._resolve_run_timeout_seconds(run)
             )
+            summary = dict(run.summary or {})
+            summary["effective_timeout_seconds"] = timeout_seconds
+            summary["timeout_source"] = timeout_source
+            summary["timeout_mode"] = (
+                "inactivity" if timeout_source == "config" else "total"
+            )
+            run.summary = summary
+            db.session.commit()
             attempt_logs = []
             final_result = None
             total_attempts = max(1, int(run.max_retry or 0) + 1)
@@ -680,15 +1221,13 @@ class UiAutomationWorker:
                         workspace / "step_screenshots"
                     )
                     attempt_env["UI_AUTOMATION_ATTEMPT"] = str(attempt)
-                    result = subprocess.run(
+                    result = UiAutomationWorker._run_observable_process(
                         command,
-                        cwd=workspace,
-                        capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                        timeout=timeout_seconds,
-                        env=attempt_env,
+                        workspace,
+                        attempt_env,
+                        timeout_seconds,
+                        run,
+                        extend_on_progress=timeout_source == "config",
                     )
                     final_result = result
                     attempt_logs.append(
@@ -715,6 +1254,7 @@ class UiAutomationWorker:
                                 f"=== Attempt {attempt}/{total_attempts} ===",
                                 f"Command: {subprocess.list2cmdline(command)}",
                                 f"Timeout: {timeout_seconds} seconds",
+                                f"Timeout source: {timeout_source}",
                                 "--- stdout ---",
                                 str(exc.stdout or ""),
                                 "--- stderr ---",
@@ -738,7 +1278,17 @@ class UiAutomationWorker:
         except subprocess.TimeoutExpired:
             run.status = "timeout"
             run.error_stage = "timeout"
-            run.error_message = "Playwright 脚本执行超时。"
+            effective_timeout = (
+                dict(run.summary or {}).get("effective_timeout_seconds")
+                or current_app.config.get("UI_AUTOMATION_RUN_TIMEOUT", 300)
+            )
+            timeout_mode = dict(run.summary or {}).get("timeout_mode")
+            if timeout_mode == "inactivity":
+                run.error_message = (
+                    f"Playwright 脚本连续 {effective_timeout} 秒没有产生新步骤，执行超时。"
+                )
+            else:
+                run.error_message = f"Playwright 脚本执行超时（{effective_timeout} 秒）。"
             if workspace:
                 (workspace / "execution.log").write_text(
                     run.error_message,
@@ -754,10 +1304,16 @@ class UiAutomationWorker:
                     encoding="utf-8",
                 )
         finally:
-            run.finished_at = datetime.utcnow()
+            run.finished_at = UiAutomationWorker._utc_now()
             run.duration_ms = int((time.perf_counter() - started) * 1000)
             if workspace and workspace.exists():
+                if run.status == "passed":
+                    UiAutomationWorker._prune_workspace_artifacts(
+                        workspace,
+                        UiAutomationWorker.PASSED_RUN_DROP_ARTIFACT_TYPES,
+                    )
                 UiAutomationWorker._register_artifacts(run, workspace)
+                UiAutomationWorker._cleanup_old_run_workspaces()
                 db.session.flush()
             artifact_count = UiAutomationArtifact.query.filter_by(run_id=run.id).count()
             summary = dict(run.summary or {})

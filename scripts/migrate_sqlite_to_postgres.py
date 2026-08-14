@@ -19,7 +19,6 @@ from app import models  # noqa: E402,F401
 
 COPY_ORDER = [
     "projects",
-    "prompt_templates",
     "modules",
     "environments",
     "variables",

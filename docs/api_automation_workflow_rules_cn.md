@@ -82,8 +82,8 @@
 
 从当前代码看，入口主要在：
 
-- [ai_parser.py](D:/work/test_web/api-test-platform/app/routes/ai_parser.py)
-- [testcase.py](D:/work/test_web/api-test-platform/app/routes/testcase.py)
+- [api_v1.py](D:/work/test_web/api-test-platform/app/routes/api_v1.py)
+- [testcase_service.py](D:/work/test_web/api-test-platform/app/services/testcase_service.py)
 
 ### 4.1 请求路径规则
 
@@ -122,17 +122,7 @@
 
 ## 5. 保存规则
 
-AI 解析并不等于自动可用，保存前至少要做一轮结构校验。
-
-当前代码里已经有：
-
-- AI 解析
-- AI 结果校验
-- 保存为测试用例
-
-对应入口：
-
-- [ai_parser.py](D:/work/test_web/api-test-platform/app/routes/ai_parser.py)
+接口文档需人工整理为平台用例 JSON，保存前至少做一轮结构校验。当前版本不提供 AI 解析、生成或 Prompt 模板业务入口。
 
 推荐保存前检查：
 

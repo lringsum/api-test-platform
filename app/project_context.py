@@ -4,12 +4,13 @@ from app.security import can_access_project, current_project_id as get_security_
 from app.security import ensure_active_project_accessible, set_active_project
 
 SESSION_KEY = "active_project_id"
+ALL_PROJECTS_VALUE = "__all__"
 
 
 def sync_active_project_id():
     if "project_id" in request.args:
         raw_value = request.args.get("project_id")
-        if raw_value in (None, ""):
+        if raw_value in (None, "", ALL_PROJECTS_VALUE):
             session.pop(SESSION_KEY, None)
             g.active_project_id = None
             return None
@@ -41,7 +42,7 @@ def get_active_project_id(default=None):
 def resolve_project_id(default=None):
     if "project_id" in request.args:
         raw_value = request.args.get("project_id")
-        if raw_value in (None, ""):
+        if raw_value in (None, "", ALL_PROJECTS_VALUE):
             return None
         try:
             project_id = int(raw_value)

@@ -6,6 +6,37 @@ from sqlalchemy import UniqueConstraint
 from app import db
 
 
+ANDROID_UI_RUN_STATUS_PENDING = "pending"
+ANDROID_UI_RUN_STATUS_RUNNING = "running"
+ANDROID_UI_RUN_STATUS_PASSED = "passed"
+ANDROID_UI_RUN_STATUS_FAILED = "failed"
+
+ANDROID_UI_RUN_STATUSES = (
+    ANDROID_UI_RUN_STATUS_PENDING,
+    ANDROID_UI_RUN_STATUS_RUNNING,
+    ANDROID_UI_RUN_STATUS_PASSED,
+    ANDROID_UI_RUN_STATUS_FAILED,
+)
+
+ANDROID_UI_RUN_STAGE_QUEUED = "queued"
+ANDROID_UI_RUN_STAGE_DOWNLOAD = "download"
+ANDROID_UI_RUN_STAGE_APK_PARSE = "apk_parse"
+ANDROID_UI_RUN_STAGE_INSTALL = "install"
+ANDROID_UI_RUN_STAGE_LAUNCH = "launch"
+ANDROID_UI_RUN_STAGE_SCREENSHOT = "screenshot"
+ANDROID_UI_RUN_STAGE_FINISHED = "finished"
+
+ANDROID_UI_RUN_STAGES = (
+    ANDROID_UI_RUN_STAGE_QUEUED,
+    ANDROID_UI_RUN_STAGE_DOWNLOAD,
+    ANDROID_UI_RUN_STAGE_APK_PARSE,
+    ANDROID_UI_RUN_STAGE_INSTALL,
+    ANDROID_UI_RUN_STAGE_LAUNCH,
+    ANDROID_UI_RUN_STAGE_SCREENSHOT,
+    ANDROID_UI_RUN_STAGE_FINISHED,
+)
+
+
 class TimestampMixin:
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(
@@ -246,6 +277,24 @@ class Project(db.Model, TimestampMixin):
         cascade="all, delete-orphan",
         lazy=True,
     )
+    android_ui_test_tasks = db.relationship(
+        "AndroidUiTestTask",
+        backref="project",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    android_ui_test_runs = db.relationship(
+        "AndroidUiTestRun",
+        backref="project",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
+    android_ui_project_flows = db.relationship(
+        "AndroidUiProjectFlow",
+        backref="project",
+        cascade="all, delete-orphan",
+        lazy=True,
+    )
 
     def __repr__(self):
         return f"<Project {self.name}>"
@@ -415,22 +464,6 @@ class TestCase(db.Model, TimestampMixin, JsonTextMixin):
         return f"<TestCase {self.name}>"
 
 
-class PromptTemplate(db.Model, TimestampMixin):
-    __tablename__ = "prompt_templates"
-    __table_args__ = (
-        UniqueConstraint("name", name="uq_prompt_template_name"),
-    )
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    description = db.Column(db.String(255), default="", nullable=False)
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-
-    def __repr__(self):
-        return f"<PromptTemplate {self.name}>"
-
-
 class UiAutomationScript(db.Model, TimestampMixin, JsonTextMixin):
     __tablename__ = "ui_automation_scripts"
     __table_args__ = (
@@ -508,6 +541,8 @@ class UiAutomationScriptVersion(db.Model, TimestampMixin):
     script_content = db.Column(db.Text, nullable=False)
     dependencies_json = db.Column(db.Text, default="[]", nullable=False)
     locator_snapshot_json = db.Column(db.Text, default="{}", nullable=False)
+    # Legacy compatibility columns are retained so existing databases and
+    # script-version inserts remain valid after AI features were retired.
     ai_generated = db.Column(db.Boolean, default=False, nullable=False)
     ai_prompt = db.Column(db.Text, default="", nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -578,6 +613,44 @@ class UiAutomationEnvironment(db.Model, TimestampMixin):
 
     def __repr__(self):
         return f"<UiAutomationEnvironment {self.name}>"
+
+
+class UiAutomationProjectSetting(db.Model, TimestampMixin, JsonTextMixin):
+    __tablename__ = "ui_automation_project_settings"
+    __table_args__ = (
+        UniqueConstraint("project_id", name="uq_ui_project_setting_project"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(
+        db.Integer,
+        db.ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    settings_json = db.Column(db.Text, default="{}", nullable=False)
+
+    @property
+    def settings(self):
+        return self.loads_json(self.settings_json, default={})
+
+    @settings.setter
+    def settings(self, value):
+        self.settings_json = self.dumps_json(value or {})
+
+    def get_int(self, key, default=0):
+        value = self.settings.get(key, default)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return int(default)
+
+    def set_value(self, key, value):
+        payload = dict(self.settings or {})
+        payload[str(key)] = value
+        self.settings = payload
+
+    def __repr__(self):
+        return f"<UiAutomationProjectSetting {self.project_id}>"
 
 
 class UiAutomationLocator(db.Model, TimestampMixin):
@@ -731,8 +804,11 @@ class UiAutomationArtifact(db.Model, TimestampMixin):
         return f"<UiAutomationArtifact {self.artifact_type}:{self.file_name}>"
 
 
-class UiAutomationAIRecord(db.Model, TimestampMixin, JsonTextMixin):
-    __tablename__ = "ui_automation_ai_records"
+class AndroidUiTestTask(db.Model, TimestampMixin):
+    __tablename__ = "android_ui_test_tasks"
+    __table_args__ = (
+        UniqueConstraint("project_id", "package_key", name="uq_android_ui_task_project_package_key"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(
@@ -740,36 +816,274 @@ class UiAutomationAIRecord(db.Model, TimestampMixin, JsonTextMixin):
         db.ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
     )
-    script_id = db.Column(
+    name = db.Column(db.String(200), nullable=False)
+    package_key = db.Column(db.String(100), nullable=False)
+    flow_mode = db.Column(db.String(20), default="basic", nullable=False)
+    flow_id = db.Column(
         db.Integer,
-        db.ForeignKey("ui_automation_scripts.id", ondelete="CASCADE"),
+        db.ForeignKey("android_ui_project_flows.id", ondelete="SET NULL"),
         nullable=True,
     )
-    run_id = db.Column(
+    flow_override_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    package_name = db.Column(db.String(200), default="", nullable=False)
+    apk_url = db.Column(db.Text, nullable=False)
+    channel_tag = db.Column(db.String(100), default="", nullable=False)
+    device_serial = db.Column(db.String(120), default="", nullable=False)
+    install_timeout_sec = db.Column(db.Integer, default=900, nullable=False)
+    launch_wait_sec = db.Column(db.Integer, default=35, nullable=False)
+    auto_uninstall = db.Column(db.Boolean, default=True, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    remark = db.Column(db.String(255), default="", nullable=False)
+    created_by = db.Column(
         db.Integer,
-        db.ForeignKey("ui_automation_runs.id", ondelete="CASCADE"),
+        db.ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    record_type = db.Column(db.String(20), nullable=False)
-    prompt_text = db.Column(db.Text, default="", nullable=False)
-    input_context_json = db.Column(db.Text, default="{}", nullable=False)
-    output_text = db.Column(db.Text, default="", nullable=False)
-    model_name = db.Column(db.String(80), default="", nullable=False)
-    status = db.Column(db.String(20), default="success", nullable=False)
-    created_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_by = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     creator = db.relationship("User", foreign_keys=[created_by], lazy=True)
-
-    @property
-    def input_context(self):
-        return self.loads_json(self.input_context_json, default={})
-
-    @input_context.setter
-    def input_context(self, value):
-        self.input_context_json = self.dumps_json(value or {})
+    updater = db.relationship("User", foreign_keys=[updated_by], lazy=True)
+    flow = db.relationship("AndroidUiProjectFlow", foreign_keys=[flow_id], lazy=True)
+    runs = db.relationship(
+        "AndroidUiTestRun",
+        backref="task",
+        cascade="all, delete-orphan",
+        order_by="AndroidUiTestRun.id.desc()",
+        lazy=True,
+    )
 
     def __repr__(self):
-        return f"<UiAutomationAIRecord {self.record_type}>"
+        return f"<AndroidUiTestTask {self.package_key}>"
+
+
+class AndroidUiTestRun(db.Model, TimestampMixin):
+    __tablename__ = "android_ui_test_runs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(
+        db.Integer,
+        db.ForeignKey("android_ui_test_tasks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    project_id = db.Column(
+        db.Integer,
+        db.ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    execution_no = db.Column(db.String(50), default="", nullable=False)
+    flow_mode = db.Column(db.String(20), default="basic", nullable=False)
+    flow_id = db.Column(
+        db.Integer,
+        db.ForeignKey("android_ui_project_flows.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    flow_snapshot_json = db.Column(db.Text, default="{}", nullable=False)
+    status = db.Column(
+        db.String(30),
+        default=ANDROID_UI_RUN_STATUS_PENDING,
+        nullable=False,
+    )
+    stage = db.Column(
+        db.String(30),
+        default=ANDROID_UI_RUN_STAGE_QUEUED,
+        nullable=False,
+    )
+    download_status = db.Column(db.String(30), default="", nullable=False)
+    download_path = db.Column(db.String(500), default="", nullable=False)
+    download_size_bytes = db.Column(db.BigInteger, default=0, nullable=False)
+    aapt_status = db.Column(db.String(30), default="", nullable=False)
+    package_name = db.Column(db.String(255), default="", nullable=False)
+    launchable_activity = db.Column(db.String(255), default="", nullable=False)
+    install_status = db.Column(db.String(30), default="", nullable=False)
+    launch_status = db.Column(db.String(30), default="", nullable=False)
+    crash_status = db.Column(db.String(30), default="", nullable=False)
+    pid = db.Column(db.String(50), default="", nullable=False)
+    current_focus = db.Column(db.Text, default="", nullable=False)
+    device_serial = db.Column(db.String(120), default="", nullable=False)
+    device_name = db.Column(db.String(200), default="", nullable=False)
+    screenshot_path = db.Column(db.String(500), default="", nullable=False)
+    log_path = db.Column(db.String(500), default="", nullable=False)
+    error_type = db.Column(db.String(50), default="", nullable=False)
+    error_message = db.Column(db.Text, default="", nullable=False)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    duration_ms = db.Column(db.Integer, default=0, nullable=False)
+    created_by = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    creator = db.relationship("User", foreign_keys=[created_by], lazy=True)
+    flow = db.relationship("AndroidUiProjectFlow", foreign_keys=[flow_id], lazy=True)
+    run_steps = db.relationship(
+        "AndroidUiRunStep",
+        backref="run",
+        cascade="all, delete-orphan",
+        order_by="AndroidUiRunStep.step_no.asc(), AndroidUiRunStep.id.asc()",
+        lazy=True,
+    )
+
+    @property
+    def flow_snapshot(self):
+        return JsonTextMixin.loads_json(self.flow_snapshot_json, default={})
+
+    @flow_snapshot.setter
+    def flow_snapshot(self, value):
+        self.flow_snapshot_json = JsonTextMixin.dumps_json(value or {})
+
+    def __repr__(self):
+        return f"<AndroidUiTestRun {self.id}:{self.status}>"
+
+
+class AndroidUiProjectFlow(db.Model, TimestampMixin):
+    __tablename__ = "android_ui_project_flows"
+    __table_args__ = (
+        UniqueConstraint("project_id", "code", name="uq_android_ui_flow_project_code"),
+        UniqueConstraint("project_id", "name", name="uq_android_ui_flow_project_name"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(
+        db.Integer,
+        db.ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = db.Column(db.String(120), nullable=False)
+    code = db.Column(db.String(80), nullable=False)
+    description = db.Column(db.String(255), default="", nullable=False)
+    is_default = db.Column(db.Boolean, default=False, nullable=False)
+    status = db.Column(db.String(20), default="active", nullable=False)
+    created_by = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    updated_by = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    creator = db.relationship("User", foreign_keys=[created_by], lazy=True)
+    updater = db.relationship("User", foreign_keys=[updated_by], lazy=True)
+    steps = db.relationship(
+        "AndroidUiProjectFlowStep",
+        backref="flow",
+        cascade="all, delete-orphan",
+        order_by="AndroidUiProjectFlowStep.sort_order.asc(), AndroidUiProjectFlowStep.id.asc()",
+        lazy=True,
+    )
+
+    def __repr__(self):
+        return f"<AndroidUiProjectFlow {self.project_id}:{self.code}>"
+
+
+class AndroidUiProjectFlowStep(db.Model, TimestampMixin):
+    __tablename__ = "android_ui_project_flow_steps"
+    __table_args__ = (
+        UniqueConstraint("flow_id", "step_no", name="uq_android_ui_flow_step_no"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    flow_id = db.Column(
+        db.Integer,
+        db.ForeignKey("android_ui_project_flows.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    step_no = db.Column(db.Integer, nullable=False)
+    step_name = db.Column(db.String(120), nullable=False)
+    step_type = db.Column(db.String(40), nullable=False)
+    selector_type = db.Column(db.String(40), default="", nullable=False)
+    selector_value = db.Column(db.String(255), default="", nullable=False)
+    input_value = db.Column(db.String(255), default="", nullable=False)
+    wait_timeout_sec = db.Column(db.Integer, default=20, nullable=False)
+    retry_times = db.Column(db.Integer, default=0, nullable=False)
+    continue_on_failure = db.Column(db.Boolean, default=False, nullable=False)
+    capture_on_success = db.Column(db.Boolean, default=True, nullable=False)
+    capture_on_failure = db.Column(db.Boolean, default=True, nullable=False)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    remark = db.Column(db.String(255), default="", nullable=False)
+
+    def __repr__(self):
+        return f"<AndroidUiProjectFlowStep {self.flow_id}:{self.step_no}>"
+
+
+class AndroidUiRunStep(db.Model, TimestampMixin, JsonTextMixin):
+    __tablename__ = "android_ui_run_steps"
+
+    id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(
+        db.Integer,
+        db.ForeignKey("android_ui_test_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    flow_id = db.Column(
+        db.Integer,
+        db.ForeignKey("android_ui_project_flows.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    template_step_id = db.Column(
+        db.Integer,
+        db.ForeignKey("android_ui_project_flow_steps.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    step_no = db.Column(db.Integer, nullable=False)
+    step_name = db.Column(db.String(120), nullable=False)
+    step_type = db.Column(db.String(40), nullable=False)
+    selector_type = db.Column(db.String(40), default="", nullable=False)
+    selector_value = db.Column(db.String(255), default="", nullable=False)
+    input_value = db.Column(db.String(255), default="", nullable=False)
+    status = db.Column(db.String(30), default="pending", nullable=False)
+    error_message = db.Column(db.Text, default="", nullable=False)
+    screenshot_path = db.Column(db.String(500), default="", nullable=False)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+    duration_ms = db.Column(db.Integer, default=0, nullable=False)
+    raw_result_json = db.Column(db.Text, default="{}", nullable=False)
+
+    flow = db.relationship("AndroidUiProjectFlow", foreign_keys=[flow_id], lazy=True)
+    template_step = db.relationship("AndroidUiProjectFlowStep", foreign_keys=[template_step_id], lazy=True)
+    artifacts = db.relationship(
+        "AndroidUiRunStepArtifact",
+        backref="run_step",
+        cascade="all, delete-orphan",
+        order_by="AndroidUiRunStepArtifact.id.asc()",
+        lazy=True,
+    )
+
+    @property
+    def raw_result(self):
+        return self.loads_json(self.raw_result_json, default={})
+
+    @raw_result.setter
+    def raw_result(self, value):
+        self.raw_result_json = self.dumps_json(value or {})
+
+    def __repr__(self):
+        return f"<AndroidUiRunStep {self.run_id}:{self.step_no}>"
+
+
+class AndroidUiRunStepArtifact(db.Model, TimestampMixin):
+    __tablename__ = "android_ui_run_step_artifacts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    run_step_id = db.Column(
+        db.Integer,
+        db.ForeignKey("android_ui_run_steps.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    artifact_type = db.Column(db.String(40), nullable=False)
+    file_path = db.Column(db.String(500), default="", nullable=False)
+    file_name = db.Column(db.String(255), default="", nullable=False)
+    file_size = db.Column(db.BigInteger, default=0, nullable=False)
+
+    def __repr__(self):
+        return f"<AndroidUiRunStepArtifact {self.run_step_id}:{self.artifact_type}>"
 
 
 class Execution(db.Model, TimestampMixin, JsonTextMixin, TriggerInfoMixin):

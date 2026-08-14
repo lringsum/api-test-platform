@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -13,11 +14,10 @@ from scripts.ui_regression_registry import PAGE_REGISTRY
 
 
 BASE_URL = "http://127.0.0.1:5000"
+SPA_MARKERS = ('<div id="app"></div>', '/app/assets/')
 
 
 def login(session):
-    response = session.get(f"{BASE_URL}/login", timeout=10)
-    response.raise_for_status()
     response = session.post(
         f"{BASE_URL}/login",
         data={"username": "admin", "password": "admin123"},
@@ -28,25 +28,17 @@ def login(session):
 
 
 def check_page(session, spec):
-    response = session.get(f"{BASE_URL}{spec.path}", timeout=10)
+    response = session.get(f"{BASE_URL}{spec.legacy_path}", timeout=10)
     response.raise_for_status()
-    html = response.text
-
+    final_path = urlparse(response.url).path.rstrip("/") or "/"
+    expected_path = spec.spa_path.rstrip("/") or "/"
     missing = []
-    if spec.page_title not in html:
-        missing.append(f"page_title={spec.page_title}")
-
-    for marker in spec.ready_markers:
-        if marker not in html:
-            missing.append(f"marker={marker}")
-
-    return {
-        "name": spec.name,
-        "module": spec.module,
-        "path": spec.path,
-        "status": "PASS" if not missing else "FAIL",
-        "missing": missing,
-    }
+    if final_path != expected_path:
+        missing.append(f"redirect={final_path}")
+    for marker in SPA_MARKERS:
+        if marker not in response.text:
+            missing.append(f"spa_marker={marker}")
+    return {"name": spec.name, "module": spec.module, "path": spec.legacy_path, "status": "PASS" if not missing else "FAIL", "missing": missing}
 
 
 def main():
@@ -54,13 +46,7 @@ def main():
     login(session)
     results = [check_page(session, spec) for spec in PAGE_REGISTRY]
     overall = "PASS" if all(item["status"] == "PASS" for item in results) else "FAIL"
-
-    payload = {
-        "gate": "route",
-        "overall": overall,
-        "results": results,
-    }
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    print(json.dumps({"gate": "route", "overall": overall, "results": results}, ensure_ascii=False, indent=2))
     raise SystemExit(0 if overall == "PASS" else 1)
 
 

@@ -3,12 +3,15 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 
+from flask import current_app
+
 from app import db
 from app.models import (
     Project,
     UiAutomationArtifact,
     UiAutomationEnvironment,
     UiAutomationLocator,
+    UiAutomationProjectSetting,
     UiAutomationRun,
     UiAutomationRunStep,
     UiAutomationScript,
@@ -16,6 +19,7 @@ from app.models import (
 )
 from app.services.base_service import ServiceError, commit_session, ensure_not_blank
 from app.utils.trigger import normalize_trigger_type
+from sqlalchemy.orm import selectinload
 
 
 DEFAULT_SCRIPT_TEMPLATE = """from playwright.sync_api import expect
@@ -31,6 +35,104 @@ def test_example(page, base_url):
 
 
 class UiAutomationService:
+    CHANGE_SUMMARY_FALLBACK = "内容更新"
+    CHANGE_SUMMARY_GARBLED_FALLBACK = "说明疑似乱码，已使用默认说明"
+    _GARBLED_TEXT_MARKERS = ("�", "锟", "Ã", "鈥", "銆", "鐧", "闂")
+
+    @staticmethod
+    def is_suspect_change_summary(value):
+        text = str(value or "").strip()
+        if not text:
+            return False
+        if "\ufffd" in text:
+            return True
+        marker_hits = sum(text.count(marker) for marker in UiAutomationService._GARBLED_TEXT_MARKERS)
+        if marker_hits >= 2:
+            return True
+        question_count = text.count("?")
+        if "???" in text:
+            return True
+        if question_count >= 2 and question_count / max(len(text), 1) >= 0.2:
+            return True
+        return False
+
+    @staticmethod
+    def sanitize_change_summary(value, fallback=None):
+        fallback_text = str(fallback or UiAutomationService.CHANGE_SUMMARY_FALLBACK).strip()
+        text = str(value or "").strip()
+        if not text:
+            return fallback_text
+        if UiAutomationService.is_suspect_change_summary(text):
+            return fallback_text
+        return text
+
+    @staticmethod
+    def display_change_summary(value, fallback=None):
+        fallback_text = str(fallback or UiAutomationService.CHANGE_SUMMARY_FALLBACK).strip()
+        text = str(value or "").strip()
+        if not text:
+            return fallback_text
+        if UiAutomationService.is_suspect_change_summary(text):
+            return UiAutomationService.CHANGE_SUMMARY_GARBLED_FALLBACK
+        return text
+
+    @staticmethod
+    def decorate_version_display(version):
+        if not version:
+            return None
+        setattr(
+            version,
+            "display_change_summary",
+            UiAutomationService.display_change_summary(version.change_summary),
+        )
+        return version
+
+    @staticmethod
+    def get_project_settings(project_id, ensure_exists=False):
+        if not project_id:
+            return None
+        normalized_project_id = int(project_id)
+        settings = UiAutomationProjectSetting.query.filter_by(project_id=normalized_project_id).first()
+        if settings or not ensure_exists:
+            return settings
+        settings = UiAutomationProjectSetting(project_id=normalized_project_id)
+        settings.settings = {}
+        db.session.add(settings)
+        db.session.flush()
+        return settings
+
+    @staticmethod
+    def get_artifact_keep_latest_runs(project_id=None):
+        default_value = int(
+            current_app.config.get("UI_AUTOMATION_ARTIFACT_KEEP_LATEST_RUNS", 30)
+        )
+        if not project_id:
+            return max(default_value, 1)
+        settings = UiAutomationService.get_project_settings(project_id)
+        if not settings:
+            return max(default_value, 1)
+        value = settings.get_int("artifact_keep_latest_runs", default_value)
+        return max(value, 1)
+
+    @staticmethod
+    def update_project_settings(project_id, artifact_keep_latest_runs):
+        normalized_project_id = int(ensure_not_blank(project_id, "所属项目"))
+        keep_latest_runs = int(ensure_not_blank(artifact_keep_latest_runs, "产物保留次数"))
+        if keep_latest_runs < 1 or keep_latest_runs > 500:
+            raise ServiceError("产物保留次数仅支持 1 到 500 之间的整数。")
+
+        project = db.session.get(Project, normalized_project_id)
+        if not project:
+            raise ServiceError("所属项目不存在。")
+
+        settings = UiAutomationService.get_project_settings(
+            normalized_project_id,
+            ensure_exists=True,
+        )
+        settings.set_value("artifact_keep_latest_runs", keep_latest_runs)
+        commit_session()
+        return settings
+
     @staticmethod
     def _normalize_locator_code(value):
         text = str(value or "").strip().lower()
@@ -93,6 +195,107 @@ class UiAutomationService:
         return (latest.version_no + 1) if latest else 1
 
     @staticmethod
+    def _is_login_script(name="", code="", tags=None):
+        normalized_tags = {
+            str(item or "").strip().lower()
+            for item in (tags or [])
+            if str(item or "").strip()
+        }
+        normalized_name = str(name or "").strip().lower()
+        normalized_code = str(code or "").strip().lower()
+        return (
+            "login" in normalized_tags
+            or "登录" in normalized_tags
+            or ("login" in normalized_code and "登录" in normalized_name)
+        )
+
+    @staticmethod
+    def default_login_dependency(project_id, exclude_script_id=None, required=True):
+        query = UiAutomationScript.query.filter_by(
+            project_id=int(project_id),
+            status="active",
+        )
+        if exclude_script_id:
+            query = query.filter(UiAutomationScript.id != int(exclude_script_id))
+        candidates = query.order_by(
+            UiAutomationScript.updated_at.desc(),
+            UiAutomationScript.id.desc(),
+        ).all()
+        login_script = next(
+            (
+                item for item in candidates
+                if UiAutomationService._is_login_script(
+                    item.name,
+                    item.code,
+                    item.tags,
+                )
+            ),
+            None,
+        )
+        if not login_script:
+            if required:
+                raise ServiceError("当前项目没有启用的用户登录前置脚本，请先录入登录脚本。")
+            return None
+        return {
+            "type": "script",
+            "role": "login_precondition",
+            "script_id": login_script.id,
+            "script_code": login_script.code,
+        }
+
+    @staticmethod
+    def _normalize_script_dependencies(
+        project_id,
+        dependencies=None,
+        require_login=True,
+        exclude_script_id=None,
+        is_login_script=False,
+    ):
+        normalized = []
+        for item in dependencies or []:
+            if isinstance(item, int) or (isinstance(item, str) and item.isdigit()):
+                item = {"type": "script", "script_id": int(item)}
+            if not isinstance(item, dict):
+                continue
+            try:
+                dependency_script_id = int(item.get("script_id") or item.get("scriptId"))
+            except (TypeError, ValueError):
+                continue
+            dependency_script = db.session.get(UiAutomationScript, dependency_script_id)
+            if (
+                not dependency_script
+                or dependency_script.project_id != int(project_id)
+                or dependency_script.id == exclude_script_id
+            ):
+                continue
+            normalized.append(
+                {
+                    "type": "script",
+                    "role": str(item.get("role") or "precondition").strip(),
+                    "script_id": dependency_script.id,
+                    "script_code": dependency_script.code,
+                }
+            )
+
+        if require_login and not is_login_script:
+            login_dependency = UiAutomationService.default_login_dependency(
+                project_id,
+                exclude_script_id=exclude_script_id,
+                required=True,
+            )
+            normalized = [
+                item for item in normalized
+                if item.get("role") != "login_precondition"
+            ]
+            normalized.insert(0, login_dependency)
+        elif is_login_script:
+            normalized = [
+                item for item in normalized
+                if item.get("role") != "login_precondition"
+            ]
+        return normalized
+
+    @staticmethod
     def create_script(
         project_id,
         name,
@@ -106,8 +309,8 @@ class UiAutomationService:
         script_content="",
         owner_id=None,
         created_by=None,
-        ai_generated=False,
-        ai_prompt="",
+        dependencies=None,
+        require_login=True,
     ):
         project_id = int(ensure_not_blank(project_id, "所属项目"))
         name = ensure_not_blank(name, "脚本名称")
@@ -137,16 +340,32 @@ class UiAutomationService:
         script.tags = UiAutomationService._normalize_tags(tags_text)
         db.session.add(script)
         db.session.flush()
+        initial_change_summary = UiAutomationService.sanitize_change_summary("\u9996\u7248\u521b\u5efa", fallback="\u9996\u7248\u521b\u5efa")
 
         version = UiAutomationScriptVersion(
             script_id=script.id,
             version_no=1,
             change_summary="首版创建",
             script_content=script_content,
-            ai_generated=bool(ai_generated),
-            ai_prompt=str(ai_prompt or "").strip(),
+            ai_generated=False,
+            ai_prompt="",
             created_by=created_by,
         )
+        version.dependencies = UiAutomationService._normalize_script_dependencies(
+            project_id,
+            dependencies=dependencies,
+            require_login=bool(require_login),
+            exclude_script_id=script.id,
+            is_login_script=(
+                not bool(require_login)
+                or UiAutomationService._is_login_script(
+                script.name,
+                script.code,
+                script.tags,
+                )
+            ),
+        )
+        version.change_summary = initial_change_summary
         db.session.add(version)
         db.session.flush()
 
@@ -168,9 +387,9 @@ class UiAutomationService:
         script_content="",
         owner_id=None,
         created_by=None,
-        ai_generated=False,
-        ai_prompt="",
         change_summary="内容更新",
+        dependencies=None,
+        require_login=None,
     ):
         script = UiAutomationService.get_script_by_id(script_id)
         name = ensure_not_blank(name, "脚本名称")
@@ -199,6 +418,30 @@ class UiAutomationService:
         script.entry_file = entry_file
         script.owner_id = owner_id
         script.tags = UiAutomationService._normalize_tags(tags_text)
+        change_summary = UiAutomationService.sanitize_change_summary(
+            change_summary,
+            fallback=UiAutomationService.CHANGE_SUMMARY_FALLBACK,
+        )
+
+        current_version = UiAutomationService._get_latest_script_version(script)
+        current_dependencies = current_version.dependencies if current_version else []
+        effective_dependencies = current_dependencies if dependencies is None else dependencies
+        is_login_script = UiAutomationService._is_login_script(
+            script.name,
+            script.code,
+            script.tags,
+        )
+        if require_login is False:
+            is_login_script = True
+        if require_login is None:
+            require_login = bool(
+                not is_login_script
+                and any(
+                    item.get("role") == "login_precondition"
+                    for item in current_dependencies
+                    if isinstance(item, dict)
+                )
+            )
 
         next_version_no = UiAutomationService._next_version_no(script.id)
         version = UiAutomationScriptVersion(
@@ -206,9 +449,16 @@ class UiAutomationService:
             version_no=next_version_no,
             change_summary=str(change_summary or "内容更新").strip(),
             script_content=script_content,
-            ai_generated=bool(ai_generated),
-            ai_prompt=str(ai_prompt or "").strip(),
+            ai_generated=False,
+            ai_prompt="",
             created_by=created_by,
+        )
+        version.dependencies = UiAutomationService._normalize_script_dependencies(
+            script.project_id,
+            dependencies=effective_dependencies,
+            require_login=bool(require_login),
+            exclude_script_id=script.id,
+            is_login_script=is_login_script,
         )
         db.session.add(version)
         db.session.flush()
@@ -242,6 +492,51 @@ class UiAutomationService:
         return query.all()
 
     @staticmethod
+    def list_scripts_with_relations(project_id=None, project_ids=None):
+        query = UiAutomationScript.query.options(
+            selectinload(UiAutomationScript.owner),
+            selectinload(UiAutomationScript.versions),
+        )
+        if project_id:
+            query = query.filter_by(project_id=project_id)
+        elif project_ids:
+            query = query.filter(UiAutomationScript.project_id.in_(project_ids))
+        return query.order_by(UiAutomationScript.updated_at.desc(), UiAutomationScript.id.desc()).all()
+
+    @staticmethod
+    def list_recent_runs_by_script_ids(script_ids, limit_per_script=5):
+        normalized_ids = []
+        for script_id in script_ids or []:
+            try:
+                normalized_id = int(script_id)
+            except (TypeError, ValueError):
+                continue
+            if normalized_id > 0 and normalized_id not in normalized_ids:
+                normalized_ids.append(normalized_id)
+
+        if not normalized_ids:
+            return {}
+
+        runs = (
+            UiAutomationRun.query.options(selectinload(UiAutomationRun.environment))
+            .filter(UiAutomationRun.script_id.in_(normalized_ids))
+            .order_by(
+                UiAutomationRun.script_id.asc(),
+                UiAutomationRun.created_at.desc(),
+                UiAutomationRun.id.desc(),
+            )
+            .all()
+        )
+
+        run_map = {script_id: [] for script_id in normalized_ids}
+        for run in runs:
+            script_runs = run_map.setdefault(run.script_id, [])
+            if len(script_runs) >= limit_per_script:
+                continue
+            script_runs.append(run)
+        return run_map
+
+    @staticmethod
     def get_script_version_by_id(version_id):
         version = db.session.get(UiAutomationScriptVersion, version_id)
         if not version:
@@ -263,8 +558,8 @@ class UiAutomationService:
             script_content=source_version.script_content,
             dependencies_json=source_version.dependencies_json,
             locator_snapshot_json=source_version.locator_snapshot_json,
-            ai_generated=source_version.ai_generated,
-            ai_prompt=source_version.ai_prompt,
+            ai_generated=False,
+            ai_prompt="",
             created_by=created_by,
         )
         db.session.add(version)
@@ -444,17 +739,17 @@ class UiAutomationService:
                 suffix += 1
             used_codes.add(locator_code)
 
-            locator_type = str(item.get("locator_type") or "css").strip().lower()
+            locator_type = str(item.get("locator_type") or item.get("type") or "css").strip().lower()
             locator_value = str(item.get("locator_value") or item.get("value") or "").strip()
             if not locator_value:
                 errors.append(f"第 {index} 项缺少定位器值。")
                 continue
 
-            page_name = str(item.get("page_name") or "").strip()
+            page_name = str(item.get("page_name") or item.get("pageName") or "").strip()
             page_url_pattern = str(item.get("page_url_pattern") or item.get("url_pattern") or "").strip()
             description = str(item.get("description") or "").strip()
             usage_scene = str(item.get("usage_scene") or item.get("scene") or "").strip()
-            is_stable = item.get("is_stable", True)
+            is_stable = item.get("is_stable", item.get("stable", True))
             if isinstance(is_stable, str):
                 is_stable = is_stable.strip().lower() in {"1", "true", "yes", "y"}
             status = str(item.get("status") or "active").strip().lower()
@@ -640,6 +935,145 @@ class UiAutomationService:
         return True
 
     @staticmethod
+    def _build_failure_analysis(status, error_message="", target_step=None):
+        normalized_status = str(status or "").strip().lower()
+        step_error = str(target_step.error_message or "").strip() if target_step else ""
+        error_message = step_error or str(error_message or "").strip()
+
+        if normalized_status in {"queued", "pending", "running"}:
+            status_labels = {
+                "queued": "排队中",
+                "pending": "等待执行",
+                "running": "执行中",
+            }
+            return {
+                "has_failure": False,
+                "category": normalized_status,
+                "category_label": status_labels[normalized_status],
+                "summary": "",
+                "root_cause": "",
+                "suggestion": "",
+                "step_index": target_step.step_index if target_step else None,
+                "step_title": target_step.step_title if target_step else "",
+                "step_type": target_step.step_type if target_step else "",
+                "locator": target_step.locator if target_step else "",
+                "match_count": None,
+                "error_message": error_message,
+            }
+
+        if normalized_status == "passed":
+            return {
+                "has_failure": False,
+                "category": "passed",
+                "category_label": "已通过",
+                "summary": "本次执行已通过。",
+                "root_cause": "本次执行成功，没有失败根因。",
+                "suggestion": "无需修复。",
+                "step_index": target_step.step_index if target_step else None,
+                "step_title": target_step.step_title if target_step else "",
+                "step_type": target_step.step_type if target_step else "",
+                "locator": target_step.locator if target_step else "",
+                "match_count": None,
+                "error_message": error_message,
+            }
+
+        locator_text = str(target_step.locator or "").strip() if target_step else ""
+        step_title = target_step.step_title if target_step else ""
+        step_type = target_step.step_type if target_step else ""
+
+        analysis_text = " ".join([error_message, locator_text, step_title, step_type])
+
+        def _has(*keywords):
+            text = analysis_text.lower()
+            return any(keyword.lower() in text for keyword in keywords)
+
+        resolved_match = re.search(r"resolved to\s+(\d+)\s+elements?", analysis_text, re.IGNORECASE)
+        match_count = int(resolved_match.group(1)) if resolved_match else None
+
+        if normalized_status == "timeout":
+            category = "timeout"
+            category_label = "执行超时"
+            root_cause = "执行在限定时间内没有完成，通常是页面等待、接口返回或脚本步骤阻塞导致。"
+            suggestion = "优先检查超时前最后一个步骤、页面网络状态和等待条件，必要时适当放宽超时配置。"
+        elif _has("strict mode violation", "strict mode") or (match_count is not None and match_count > 1):
+            category = "locator_not_unique"
+            category_label = "元素不唯一"
+            root_cause = (
+                f"当前 XPath 同时命中了 {match_count} 个元素，Playwright 严格模式无法确定要操作哪一个。"
+                if match_count is not None
+                else "当前 XPath 命中了多个元素，Playwright 严格模式无法确定要操作哪一个。"
+            )
+            suggestion = "结合失败截图和页面结构收窄 XPath，增加稳定的父级、文本或属性条件，确保只命中一个目标元素。"
+        elif _has(
+            "element(s) not found",
+            "element not found",
+            "no element found",
+            "resolved to 0 elements",
+            "actual value: none",
+        ) or (_has("waiting for locator") and _has("timed out", "timeout")):
+            category = "locator_not_found"
+            category_label = "元素定位不到"
+            match_count = 0
+            root_cause = "当前 XPath 在限定时间内没有命中目标元素，可能是页面文案、结构、属性或加载时机发生了变化。"
+            suggestion = "结合失败截图确认目标元素当前状态，并按实际页面更新 XPath；如元素延迟出现，再补充明确的等待条件。"
+        elif _has("assert", "expect", "to_be_", "to_have_", "not.to_", "visible", "hidden"):
+            category = "assertion"
+            category_label = "断言失败"
+            root_cause = "脚本断言结果与页面实际状态不一致，通常是页面文案、结构或数据状态发生变化。"
+            suggestion = "先核对失败步骤截图与日志，再让 AI 按当前页面状态修复断言或等待条件。"
+        elif _has("timed out", "timeout", "??"):
+            category = "timeout"
+            category_label = "执行超时"
+            root_cause = "执行在限定时间内没有完成，通常是页面等待、接口返回或脚本步骤阻塞导致。"
+            suggestion = "优先检查超时前最后一个步骤、页面网络状态和等待条件，必要时适当放宽超时配置。"
+        elif _has("locator", "waiting for", "strict mode", "element", "selector", "???", "???"):
+            category = "locator"
+            category_label = "定位器异常"
+            root_cause = "当前定位器没有稳定命中目标元素，可能是页面结构、属性或可见状态发生了变化。"
+            suggestion = "结合失败截图和页面结构检查 XPath，确保定位条件稳定且只命中目标元素。"
+        elif _has("navigation", "goto", "load", "network", "??"):
+            category = "navigation"
+            category_label = "页面跳转异常"
+            root_cause = "页面打开、跳转或资源加载过程异常，通常与地址配置、网络波动或页面加载事件有关。"
+            suggestion = "检查 base_url、路由跳转、网络请求和 wait_for_load_state 等等待条件是否合理。"
+        else:
+            category = "script"
+            category_label = "脚本执行异常"
+            root_cause = error_message or "执行过程中出现了未归类的异常。"
+            suggestion = "结合运行日志和步骤明细，优先让 AI 根据失败步骤做一次脚本修复。"
+
+        summary_parts = [category_label]
+        if step_title:
+            summary_parts.append(f"失败步骤：{step_title}")
+        if category == "locator_not_unique" and match_count is not None:
+            summary_parts.append(f"命中 {match_count} 个元素")
+
+        return {
+            "has_failure": True,
+            "category": category,
+            "category_label": category_label,
+            "summary": "；".join(summary_parts),
+            "root_cause": root_cause,
+            "suggestion": suggestion,
+            "step_index": target_step.step_index if target_step else None,
+            "step_title": step_title,
+            "step_type": step_type,
+            "locator": locator_text,
+            "match_count": match_count,
+            "error_message": error_message,
+        }
+
+    @staticmethod
+    def analyze_step_failure(step):
+        if not step:
+            raise ServiceError("UI 执行步骤不存在。")
+        return UiAutomationService._build_failure_analysis(
+            step.status,
+            error_message=step.error_message,
+            target_step=step,
+        )
+
+    @staticmethod
     def analyze_run_failure(run):
         if not run:
             raise ServiceError("UI 执行记录不存在。")
@@ -648,73 +1082,14 @@ class UiAutomationService:
         failed_step = next((step for step in steps if step.status == "failed"), None)
         last_step = steps[-1] if steps else None
         target_step = failed_step or last_step
-        error_message = str(run.error_message or "").strip()
-        if target_step and not error_message:
-            error_message = str(target_step.error_message or "").strip()
-
-        if run.status == "passed":
-            return {
-                "has_failure": False,
-                "category": "passed",
-                "category_label": "已通过",
-                "root_cause": "本次执行成功，没有失败根因。",
-                "suggestion": "无需修复。",
-                "step_index": target_step.step_index if target_step else None,
-                "step_title": target_step.step_title if target_step else "",
-                "step_type": target_step.step_type if target_step else "",
-                "locator": target_step.locator if target_step else "",
-                "error_message": error_message,
-            }
-
-        locator_text = str(target_step.locator or "").strip() if target_step else ""
-        step_title = target_step.step_title if target_step else ""
-        step_type = target_step.step_type if target_step else ""
-
-        def _has(*keywords):
-            text = " ".join([error_message, locator_text, step_title, step_type]).lower()
-            return any(keyword.lower() in text for keyword in keywords)
-
-        if run.status == "timeout" or _has("timed out", "timeout", "超时"):
-            category = "timeout"
-            category_label = "执行超时"
-            root_cause = "脚本执行时间过长，可能是页面加载慢、等待条件过严，或者某一步卡住没有继续往下走。"
-            suggestion = "优先检查长等待和不稳定跳转，适当缩小步骤范围，增加更明确的等待条件。"
-        elif _has("assert", "expect", "to_be_", "not.to_", "visible", "hidden"):
-            category = "assertion"
-            category_label = "断言失败"
-            root_cause = "页面已经跑到目标步骤，但断言条件没有满足，通常是文案、状态或可见性变化。"
-            suggestion = "优先核对断言文本和状态条件，必要时让 AI 调整断言或者补充更稳的前置步骤。"
-        elif _has("locator", "waiting for", "strict mode", "element", "selector", "找不到", "未找到"):
-            category = "locator"
-            category_label = "定位器失效"
-            root_cause = "当前步骤大概率是定位方式不稳定，元素没有被找到，或者命中了错误元素。"
-            suggestion = "优先改成更稳定的 locator，尽量使用项目定位器库中的 Role、Label、Test ID。"
-        elif _has("navigation", "goto", "load", "network", "页面"):
-            category = "navigation"
-            category_label = "页面加载问题"
-            root_cause = "脚本进入页面或页面切换过程中出现了异常，可能是地址错误、跳转未完成或页面未加载。"
-            suggestion = "检查 base_url、路由路径和登录跳转，必要时加上 wait_for_load_state 或更明确的加载条件。"
-        else:
-            category = "script"
-            category_label = "脚本执行异常"
-            root_cause = error_message or "执行过程中出现了未归类的异常。"
-            suggestion = "结合运行日志和步骤明细，优先让 AI 根据失败步骤做一次脚本修复。"
-
-        return {
-            "has_failure": True,
-            "category": category,
-            "category_label": category_label,
-            "root_cause": root_cause,
-            "suggestion": suggestion,
-            "step_index": target_step.step_index if target_step else None,
-            "step_title": step_title,
-            "step_type": step_type,
-            "locator": locator_text,
-            "error_message": error_message,
-        }
+        return UiAutomationService._build_failure_analysis(
+            run.status,
+            error_message=run.error_message,
+            target_step=target_step,
+        )
 
     @staticmethod
-    def build_locator_ai_context(project_id=None, project_ids=None):
+    def build_locator_context(project_id=None, project_ids=None):
         locators = UiAutomationService.list_locators(project_id=project_id, project_ids=project_ids)
         return [
             {
@@ -742,6 +1117,63 @@ class UiAutomationService:
         return query.order_by(UiAutomationEnvironment.updated_at.desc(), UiAutomationEnvironment.id.desc()).all()
 
     @staticmethod
+    def create_environment(project_id, name, base_url, browser_default="chromium", headless_default=True, timeout_ms=30000, retry_times=0, viewport_width=1440, viewport_height=900, storage_state_path="", proxy_config=None, runtime_variables=None, status="active", description=""):
+        project_id = int(ensure_not_blank(project_id, "project"))
+        if not db.session.get(Project, project_id):
+            raise ServiceError("Project not found.")
+        name = ensure_not_blank(name, "environment name")
+        if UiAutomationEnvironment.query.filter_by(project_id=project_id, name=name).first():
+            raise ServiceError("An environment with that name already exists.")
+        environment = UiAutomationEnvironment(
+            project_id=project_id, name=name, base_url=ensure_not_blank(base_url, "base URL"),
+            browser_default=str(browser_default or "chromium").strip().lower(), headless_default=bool(headless_default),
+            timeout_ms=int(timeout_ms or 30000), retry_times=int(retry_times or 0), viewport_width=int(viewport_width or 1440), viewport_height=int(viewport_height or 900),
+            storage_state_path=str(storage_state_path or "").strip(), status=str(status or "active").strip().lower(), description=str(description or "").strip(),
+        )
+        environment.proxy_config = proxy_config if isinstance(proxy_config, dict) else {}
+        environment.runtime_variables = runtime_variables if isinstance(runtime_variables, dict) else {}
+        db.session.add(environment)
+        commit_session()
+        return environment
+
+    @staticmethod
+    def update_environment(environment_id, **payload):
+        environment = db.session.get(UiAutomationEnvironment, int(environment_id))
+        if not environment:
+            raise ServiceError("Environment not found.")
+        name = ensure_not_blank(payload.get("name"), "environment name")
+        duplicate = UiAutomationEnvironment.query.filter(
+            UiAutomationEnvironment.project_id == environment.project_id,
+            UiAutomationEnvironment.name == name,
+            UiAutomationEnvironment.id != environment.id,
+        ).first()
+        if duplicate:
+            raise ServiceError("An environment with that name already exists.")
+        environment.name, environment.base_url = name, ensure_not_blank(payload.get("base_url"), "base URL")
+        for field, default in (("browser_default", "chromium"), ("headless_default", True), ("timeout_ms", 30000), ("retry_times", 0), ("viewport_width", 1440), ("viewport_height", 900), ("storage_state_path", ""), ("status", "active"), ("description", "")):
+            value = payload.get(field, getattr(environment, field, default))
+            if field in {"timeout_ms", "retry_times", "viewport_width", "viewport_height"}:
+                value = int(value or default)
+            elif field == "headless_default":
+                value = bool(value)
+            elif field in {"browser_default", "status", "storage_state_path", "description"}:
+                value = str(value or default).strip()
+            setattr(environment, field, value)
+        environment.proxy_config = payload.get("proxy_config") if isinstance(payload.get("proxy_config"), dict) else environment.proxy_config
+        environment.runtime_variables = payload.get("runtime_variables") if isinstance(payload.get("runtime_variables"), dict) else environment.runtime_variables
+        commit_session()
+        return environment
+
+    @staticmethod
+    def delete_environment(environment_id):
+        environment = db.session.get(UiAutomationEnvironment, int(environment_id))
+        if not environment:
+            raise ServiceError("Environment not found.")
+        db.session.delete(environment)
+        commit_session()
+        return True
+
+    @staticmethod
     def list_runs(project_id=None, project_ids=None):
         query = UiAutomationRun.query
         if project_id:
@@ -753,6 +1185,32 @@ class UiAutomationService:
     @staticmethod
     def list_artifacts(run_id):
         return UiAutomationArtifact.query.filter_by(run_id=run_id).order_by(UiAutomationArtifact.created_at.asc()).all()
+
+    @staticmethod
+    def list_artifacts_by_run_ids(run_ids):
+        normalized_ids = []
+        for run_id in run_ids or []:
+            try:
+                normalized_id = int(run_id)
+            except (TypeError, ValueError):
+                continue
+            if normalized_id > 0 and normalized_id not in normalized_ids:
+                normalized_ids.append(normalized_id)
+
+        if not normalized_ids:
+            return {}
+
+        artifacts = (
+            UiAutomationArtifact.query
+            .filter(UiAutomationArtifact.run_id.in_(normalized_ids))
+            .order_by(UiAutomationArtifact.run_id.asc(), UiAutomationArtifact.created_at.asc())
+            .all()
+        )
+
+        artifact_map = {run_id: [] for run_id in normalized_ids}
+        for artifact in artifacts:
+            artifact_map.setdefault(artifact.run_id, []).append(artifact)
+        return artifact_map
 
     @staticmethod
     def list_run_steps(run_id):
@@ -785,6 +1243,7 @@ class UiAutomationService:
         run_mode="manual",
         trigger_type="automatic",
         max_retry=0,
+        run_timeout_seconds=None,
         trigger_source="ui",
         trigger_user_id=None,
     ):
@@ -849,6 +1308,18 @@ class UiAutomationService:
             "run_mode": run.run_mode,
             "trigger_type": run.trigger_type,
             "trigger_person": run.trigger_person_name,
+            "preconditions": version.dependencies,
         }
+        if run_timeout_seconds not in (None, ""):
+            try:
+                timeout_value = int(run_timeout_seconds)
+            except (TypeError, ValueError):
+                raise ServiceError("执行超时时长不合法。")
+            if timeout_value < 30 or timeout_value > 3600:
+                raise ServiceError("执行超时时长需在 30 到 3600 秒之间。")
+            summary = dict(run.summary or {})
+            summary["configured_timeout_seconds"] = timeout_value
+            summary["timeout_source"] = "run"
+            run.summary = summary
         commit_session()
         return run

@@ -1,8 +1,10 @@
+import json
 import os
 import re
 from datetime import datetime, timedelta, timezone
 
 from flask import Flask
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 
@@ -12,6 +14,7 @@ from config import Config
 
 
 db = SQLAlchemy()
+migrate = Migrate(compare_type=True)
 BJT_TZ = timezone(timedelta(hours=8))
 
 from app.project_context import get_active_project_id, sync_active_project_id
@@ -21,35 +24,15 @@ from app.services.security_service import SecurityService
 
 
 def register_blueprints(app):
+    from app.routes.api_v1 import api_v1_bp
     from app.routes.auth import auth_bp
-    from app.routes.admin import admin_bp
-    from app.routes.ai_parser import ai_bp
-    from app.routes.dashboard import dashboard_bp
-    from app.routes.environment import environment_bp
-    from app.routes.execution import execution_bp
-    from app.routes.module import module_bp
-    from app.routes.project import project_bp
-    from app.routes.prompt_template import prompt_bp
-    from app.routes.ui_automation import ui_automation_bp
-    from app.routes.report import report_bp
-    from app.routes.scenario import scenario_bp
-    from app.routes.testcase import testcase_bp
-    from app.routes.variable import variable_bp
+    from app.routes.legacy_spa import legacy_spa_bp
+    from app.routes.spa import spa_bp
 
+    app.register_blueprint(api_v1_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(dashboard_bp)
-    app.register_blueprint(project_bp)
-    app.register_blueprint(module_bp)
-    app.register_blueprint(environment_bp)
-    app.register_blueprint(variable_bp)
-    app.register_blueprint(testcase_bp)
-    app.register_blueprint(scenario_bp)
-    app.register_blueprint(ai_bp)
-    app.register_blueprint(ui_automation_bp)
-    app.register_blueprint(execution_bp)
-    app.register_blueprint(report_bp)
-    app.register_blueprint(prompt_bp)
+    app.register_blueprint(spa_bp)
+    app.register_blueprint(legacy_spa_bp)
 
 
 def create_app():
@@ -61,18 +44,39 @@ def create_app():
         __name__,
         instance_path=instance_path,
         static_folder=os.path.join(project_root, "public"),
-        static_url_path="",
+        static_url_path="/static",
     )
     app.config.from_object(Config)
+    _apply_runtime_config_overrides(app)
 
     os.makedirs(app.instance_path, exist_ok=True)
 
     db.init_app(app)
+    migrate.init_app(app, db)
 
+    if app.config.get("AUTO_DB_BOOTSTRAP", False):
+        _bootstrap_database(app)
+
+    with app.app_context():
+        SecurityService.ensure_default_data()
+
+    register_blueprints(app)
+    return app
+
+
+def _bootstrap_database(app):
+    """Temporary compatibility bootstrap for local SQLite and legacy environments.
+
+    Long-term schema evolution should use Alembic migrations.
+    """
     with app.app_context():
         from app import models  # noqa: F401
 
         db.create_all()
+
+        if not app.config.get("AUTO_DB_COMPAT_PATCH", False):
+            return
+
         inspector = inspect(db.engine)
         ui_environment_columns = {
             column["name"]
@@ -145,7 +149,17 @@ def create_app():
                 )
             )
         db.session.commit()
-        SecurityService.ensure_default_data()
+
+
+def _apply_runtime_config_overrides(app):
+    # Keep these flags dynamic so local scripts/tests can switch behavior per-process.
+    auto_bootstrap = os.environ.get("AUTO_DB_BOOTSTRAP")
+    if auto_bootstrap is not None:
+        app.config["AUTO_DB_BOOTSTRAP"] = auto_bootstrap.lower() == "true"
+
+    auto_compat_patch = os.environ.get("AUTO_DB_COMPAT_PATCH")
+    if auto_compat_patch is not None:
+        app.config["AUTO_DB_COMPAT_PATCH"] = auto_compat_patch.lower() == "true"
 
     @app.template_filter("bjt")
     def beijing_time(value, fmt="%Y-%m-%d %H:%M:%S"):
@@ -168,6 +182,34 @@ def create_app():
             return fallback or "文本异常"
         return text
 
+    @app.template_filter("pretty_json")
+    def pretty_json(value):
+        return json.dumps(value or {}, ensure_ascii=False, indent=2)
+
+    @app.template_filter("browser_label")
+    def browser_label(value):
+        mapping = {
+            "chromium": "Chromium 内核",
+            "chrome": "Chrome 浏览器",
+            "firefox": "Firefox 浏览器",
+            "webkit": "WebKit 内核",
+        }
+        text = str(value or "").strip()
+        return mapping.get(text.lower(), text or "-")
+
+    @app.template_filter("result_status_label")
+    def result_status_label(value):
+        mapping = {
+            "passed": "成功",
+            "failed": "失败",
+            "timeout": "超时",
+            "queued": "排队中",
+            "running": "执行中",
+            "recovered": "已恢复",
+        }
+        text = str(value or "").strip()
+        return mapping.get(text.lower(), text or "-")
+
     @app.before_request
     def _load_current_user():
         load_current_user()
@@ -175,11 +217,14 @@ def create_app():
     @app.before_request
     def _protect_authenticated_routes():
         endpoint = request.endpoint or ""
-        if endpoint.startswith("static") or endpoint.startswith("auth."):
+        if endpoint.startswith("static") or endpoint.startswith("auth.") or request.path.startswith("/app/assets/") or request.path in {"/app/login", "/app/forbidden", "/api/v1/session/login"}:
             return None
 
         user = get_current_user()
         if not user:
+            if endpoint.startswith("api_v1."):
+                from flask import jsonify
+                return jsonify({"success": False, "message": "Authentication required.", "data": {}}), 401
             flash("请先登录后再访问系统。", "warning")
             return redirect(url_for("auth.login", next=request.url))
 
@@ -198,6 +243,3 @@ def create_app():
             "current_user": user,
             "has_permission": has_permission,
         }
-
-    register_blueprints(app)
-    return app

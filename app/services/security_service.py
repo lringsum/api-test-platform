@@ -9,6 +9,7 @@ from app.services.base_service import ServiceError, commit_session, ensure_not_b
 
 
 PROJECT_ACCESS_LEVELS = ["viewer", "editor", "executor", "owner"]
+RETIRED_PERMISSION_CODES = {"ai:use", "prompt:view", "prompt:create", "prompt:edit", "prompt:delete"}
 
 DEFAULT_PERMISSIONS = [
     {"code": "dashboard:view", "name": "仪表盘查看", "category": "menu", "group_name": "总览", "sort_order": 10},
@@ -38,11 +39,6 @@ DEFAULT_PERMISSIONS = [
     {"code": "scenario:edit", "name": "场景编辑", "category": "action", "group_name": "测试设计", "sort_order": 72},
     {"code": "scenario:delete", "name": "场景删除", "category": "action", "group_name": "测试设计", "sort_order": 73},
     {"code": "scenario:run", "name": "场景执行", "category": "action", "group_name": "测试设计", "sort_order": 74},
-    {"code": "ai:use", "name": "AI 解析", "category": "menu", "group_name": "测试设计", "sort_order": 80},
-    {"code": "prompt:view", "name": "Prompt 查看", "category": "menu", "group_name": "测试设计", "sort_order": 90},
-    {"code": "prompt:create", "name": "Prompt 新建", "category": "action", "group_name": "测试设计", "sort_order": 91},
-    {"code": "prompt:edit", "name": "Prompt 编辑", "category": "action", "group_name": "测试设计", "sort_order": 92},
-    {"code": "prompt:delete", "name": "Prompt 删除", "category": "action", "group_name": "测试设计", "sort_order": 93},
     {"code": "uiauto:view", "name": "UI 自动化查看", "category": "menu", "group_name": "UI 自动化", "sort_order": 95},
     {"code": "uiauto:script:view", "name": "UI 脚本查看", "category": "menu", "group_name": "UI 自动化", "sort_order": 96},
     {"code": "uiauto:script:create", "name": "UI 脚本创建", "category": "action", "group_name": "UI 自动化", "sort_order": 97},
@@ -51,6 +47,12 @@ DEFAULT_PERMISSIONS = [
     {"code": "uiauto:script:run", "name": "UI 脚本执行", "category": "action", "group_name": "UI 自动化", "sort_order": 100},
     {"code": "uiauto:locator:view", "name": "定位器查看", "category": "menu", "group_name": "UI 自动化", "sort_order": 101},
     {"code": "uiauto:locator:manage", "name": "定位器管理", "category": "action", "group_name": "UI 自动化", "sort_order": 102},
+    {"code": "android_uiauto:view", "name": "Android UI 自动化查看", "category": "menu", "group_name": "UI 自动化", "sort_order": 103},
+    {"code": "android_uiauto:task:create", "name": "Android UI 任务创建", "category": "action", "group_name": "UI 自动化", "sort_order": 104},
+    {"code": "android_uiauto:task:edit", "name": "Android UI 任务编辑", "category": "action", "group_name": "UI 自动化", "sort_order": 105},
+    {"code": "android_uiauto:task:delete", "name": "Android UI 任务删除", "category": "action", "group_name": "UI 自动化", "sort_order": 106},
+    {"code": "android_uiauto:task:run", "name": "Android UI 任务执行", "category": "action", "group_name": "UI 自动化", "sort_order": 107},
+    {"code": "android_uiauto:execution:view", "name": "Android UI 执行记录查看", "category": "menu", "group_name": "UI 自动化", "sort_order": 108},
     {"code": "execution:view", "name": "执行查看", "category": "menu", "group_name": "执行与报告", "sort_order": 110},
     {"code": "execution:detail_full", "name": "执行明细全内容", "category": "action", "group_name": "执行与报告", "sort_order": 101},
     {"code": "execution:run", "name": "执行发起", "category": "action", "group_name": "执行与报告", "sort_order": 102},
@@ -92,11 +94,6 @@ DEFAULT_ROLES = [
             "scenario:edit",
             "scenario:delete",
             "scenario:run",
-            "ai:use",
-            "prompt:view",
-            "prompt:create",
-            "prompt:edit",
-            "prompt:delete",
             "uiauto:view",
             "uiauto:script:view",
             "uiauto:script:create",
@@ -105,6 +102,12 @@ DEFAULT_ROLES = [
             "uiauto:script:run",
             "uiauto:locator:view",
             "uiauto:locator:manage",
+            "android_uiauto:view",
+            "android_uiauto:task:create",
+            "android_uiauto:task:edit",
+            "android_uiauto:task:delete",
+            "android_uiauto:task:run",
+            "android_uiauto:execution:view",
             "execution:view",
             "execution:detail_full",
             "execution:run",
@@ -132,14 +135,17 @@ DEFAULT_ROLES = [
             "scenario:create",
             "scenario:edit",
             "scenario:run",
-            "ai:use",
-            "prompt:view",
             "uiauto:view",
             "uiauto:script:view",
             "uiauto:script:create",
             "uiauto:script:edit",
             "uiauto:script:run",
             "uiauto:locator:view",
+            "android_uiauto:view",
+            "android_uiauto:task:create",
+            "android_uiauto:task:edit",
+            "android_uiauto:task:run",
+            "android_uiauto:execution:view",
             "execution:view",
             "execution:detail_full",
             "execution:run",
@@ -160,10 +166,11 @@ DEFAULT_ROLES = [
             "variable:view",
             "testcase:view",
             "scenario:view",
-            "prompt:view",
             "uiauto:view",
             "uiauto:script:view",
             "uiauto:locator:view",
+            "android_uiauto:view",
+            "android_uiauto:execution:view",
             "execution:view",
             "report:view",
         ],
@@ -187,6 +194,16 @@ class SecurityService:
     @staticmethod
     def ensure_default_data():
         created = False
+
+        retired_permissions = Permission.query.filter(
+            Permission.code.in_(RETIRED_PERMISSION_CODES)
+        ).all()
+        for permission in retired_permissions:
+            permission.roles = []
+            db.session.delete(permission)
+            created = True
+        if retired_permissions:
+            db.session.flush()
 
         permissions_by_code = {item.code: item for item in Permission.query.all()}
         for item in DEFAULT_PERMISSIONS:

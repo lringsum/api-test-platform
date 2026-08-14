@@ -158,8 +158,8 @@
 
 对应代码入口大致在：
 
-- [ai_parser.py](D:/work/test_web/api-test-platform/app/routes/ai_parser.py)
-- [testcase.py](D:/work/test_web/api-test-platform/app/routes/testcase.py)
+- [api_v1.py](D:/work/test_web/api-test-platform/app/routes/api_v1.py)
+- [testcase_service.py](D:/work/test_web/api-test-platform/app/services/testcase_service.py)
 - [execution_service.py](D:/work/test_web/api-test-platform/app/services/execution_service.py)
 
 ## 7. 这项目里最值得保护的资源

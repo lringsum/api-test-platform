@@ -18,6 +18,81 @@ It is not a native Codex thread import. It is a local continuity record for the 
 - When resuming work in the current API-auth thread, use the session summaries below to recover prior context.
 - If a specific old conversation needs full detail, open the referenced `jsonl` file and inspect it directly.
 
+## Current unfinished task snapshot
+
+The most recent recovered thread is not about a product feature in the Flask app itself. It is a Codex-history continuity task:
+
+- the user switched from `openai` auth to `apikey` auth
+- a prior conversation about "history record optimization" became invisible
+- the missing work was to consolidate history across API automation, UI automation, and scenario automation into one continuous thread of context
+
+Treat this as a recovery / continuity problem, not a new feature request. The useful next step is to keep the recovered project memory together in one place so the same task can be resumed without re-deriving the background.
+
+## What the history-consolidation task is trying to unify
+
+The recovered conversation was circling around three history streams that already exist in the app but are presented separately:
+
+- API execution history
+  - route: `/executions/history`
+  - template: `app/templates/execution/history.html`
+- scenario execution history
+  - route: `/scenarios/executions/history`
+  - template: `app/templates/scenarios/history.html`
+- UI automation history / replay / script-version history
+  - routes and templates under `app/routes/ui_automation.py`
+  - especially `app/templates/ui_automation/replays.html`, `replay_detail.html`, and `script_versions.html`
+
+The unfinished optimization was about making these histories feel like one continuous workspace history story instead of three unrelated pages. In practice that means:
+
+- keeping the relevant project context visible
+- preserving drill-down links between list, detail, and history pages
+- making the history entry points feel consistent in layout and behavior
+- not losing context when the user switches auth mode or re-enters the app later
+
+This is why the task felt like a "conversation history" fix even though most of the actual pages are execution-history pages inside the product.
+
+## Next-step implementation checklist
+
+If we continue this task in code, the work should go in this order:
+
+1. Verify the three history entry points still behave consistently
+   - API execution history
+   - scenario execution history
+   - UI automation replay / script-version history
+
+2. Check whether the shared history affordances are aligned
+   - page title and page description
+   - back / return links
+   - project filter behavior
+   - pagination behavior
+   - empty-state copy
+
+3. Make sure history pages preserve project context
+   - `project_id` should survive navigation where relevant
+   - drilling from list to detail and back should not drop context
+   - active project scope should stay stable after auth/login transitions
+
+4. Look for places where the three history views still diverge visually
+   - top summary cards
+   - filter blocks
+   - history tables
+   - right-side rails / quick links
+   - action buttons for report, replay, and detail navigation
+
+5. Decide whether the unification is only documentation / navigation polish
+   or whether a new shared history shell is needed
+   - if it is only polish, adjust templates and shared macros
+   - if it needs a new shell, extract common history layout pieces first
+
+6. Re-run the relevant regressions after any change
+   - route-level checks
+   - browser/UI regression checks
+   - any execution-history or replay-history smoke tests that cover the touched pages
+
+The main acceptance signal is simple:
+
+- a user should be able to move between API, scenario, and UI automation history without feeling like they jumped into three unrelated subsystems
+
 ## Session index
 
 ### 2026-06-22

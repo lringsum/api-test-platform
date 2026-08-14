@@ -1,0 +1,14 @@
+Single-database configuration for Flask-Migrate/Alembic.
+
+Quick start:
+
+1) Create migration:
+   flask --app run.py db migrate -m "describe change"
+
+2) Apply migration:
+   flask --app run.py db upgrade
+
+Notes:
+- `migrations/` is pre-initialized and tracked in this repository.
+- The app keeps lightweight bootstrap via `AUTO_DB_BOOTSTRAP=true` for local/dev startup.
+- Legacy inline compatibility patches are guarded by `AUTO_DB_COMPAT_PATCH` and default to `false`.

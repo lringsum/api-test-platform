@@ -45,6 +45,14 @@ def validate_payload(payload, scenario):
         missing.append("success_flag")
 
     data = payload.get("data") or {}
+    if isinstance(data, list):
+        for key in scenario.get("expect_non_empty_keys", ()):
+            if key != "items" or not data:
+                missing.append(f"{key}_non_empty")
+        for key in scenario.get("expect_empty_keys", ()):
+            if key == "items" and data:
+                missing.append(f"{key}_empty")
+        return missing
     for key in scenario.get("expect_non_empty_keys", ()):
         if not data.get(key):
             missing.append(f"{key}_non_empty")

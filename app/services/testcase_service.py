@@ -9,7 +9,6 @@ from app.models import Module, Project, TestCase
 from app.services.base_service import (
     ServiceError,
     commit_session,
-    ensure_choice,
     ensure_not_blank,
     parse_json_text,
     validate_case_schema,
@@ -26,8 +25,6 @@ class InterfaceGroup:
     testcases: list[TestCase] = field(default_factory=list)
     active_count: int = 0
     inactive_count: int = 0
-    ai_count: int = 0
-    manual_count: int = 0
     latest_created_at: object = None
 
 
@@ -163,8 +160,76 @@ class TestCaseService:
             if fragment in url_text:
                 return name
 
+        if "material_work_order/get_assignment_page_data" in url_text:
+            return "素材工单获取分配页面数据接口"
+        if "material_work_order/get_assignment_form_meta" in url_text:
+            return "素材工单获取分配表单元数据接口"
+        if "material_work_order/assign" in url_text:
+            return "素材工单派单接口"
+        if "material_work_order/self_accept" in url_text:
+            return "素材工单自接工单接口"
+        if "material_work_order/reassign" in url_text:
+            return "素材工单改派接口"
+        if "material_work_order/cancel" in url_text:
+            return "素材工单取消工单接口"
+        if "material_work_order/delete" in url_text:
+            return "素材工单删除已取消工单接口"
+        if "material_work_order/get_upload_page_data" in url_text:
+            return "素材工单获取上传页面数据接口"
+        if "material_work_order/upload_temp_file" in url_text:
+            return "素材工单上传临时文件接口"
+        if "material_work_order/get_upload_form_meta" in url_text:
+            return "素材工单获取上传表单元数据接口"
+        if "material_work_order/complete_upload_session" in url_text:
+            return "素材工单批量完成上传会话接口"
+        if "material_work_order/delete_asset" in url_text:
+            return "素材工单删除工单内素材接口"
+        if "material_work_order/submit_review" in url_text:
+            return "素材工单提交审核接口"
+        if "material_work_order/review" in url_text:
+            return "素材工单审核工单接口"
         if "material_work_order" in url_text:
             return "素材工单接口"
+        if "material_ban/id/get_page_data" in url_text:
+            return "素材ID封禁获取页面数据接口"
+        if "material_ban/id/get_form_meta" in url_text:
+            return "素材ID封禁获取表单元数据接口"
+        if "material_ban/id/get_list" in url_text:
+            return "素材ID封禁规则列表接口"
+        if "material_ban/id/get_detail" in url_text:
+            return "素材ID封禁规则详情接口"
+        if "material_ban/id/save" in url_text:
+            return "素材ID封禁规则保存接口"
+        if "material_ban/id/delete" in url_text:
+            return "素材ID封禁规则删除接口"
+        if "material_ban/id/get_filter_options" in url_text:
+            return "素材ID封禁筛选项接口"
+        if "material_ban/keyword/get_page_data" in url_text:
+            return "素材关键字封禁获取页面数据接口"
+        if "material_ban/keyword/get_form_meta" in url_text:
+            return "素材关键字封禁获取表单元数据接口"
+        if "material_ban/keyword/get_list" in url_text:
+            return "素材关键字封禁规则列表接口"
+        if "material_ban/keyword/get_detail" in url_text:
+            return "素材关键字封禁规则详情接口"
+        if "material_ban/keyword/save" in url_text:
+            return "素材关键字封禁规则保存接口"
+        if "material_ban/keyword/delete" in url_text:
+            return "素材关键字封禁规则删除接口"
+        if "material_ban/keyword/get_filter_options" in url_text:
+            return "素材关键字封禁筛选项接口"
+        if "material_ban/get_page_capabilities" in url_text:
+            return "素材封禁页面能力接口"
+        if "material_ban" in url_text:
+            return "素材封禁接口"
+        if "admin/role/get_data_permission_items" in url_text:
+            return "数据权限列表（v2）接口"
+        if "admin/role/get" in url_text:
+            return "角色编辑（v2）接口"
+        if "admin/resource_option/query" in url_text:
+            return "统一范围资源列表（v2）接口"
+        if "admin/permission_point/get_list" in url_text:
+            return "权限点列表（v2）接口"
         if "material_library" in url_text:
             return "素材库接口"
         if "/login" in url_text:
@@ -263,11 +328,6 @@ class TestCaseService:
                 interface_group.active_count += 1
             else:
                 interface_group.inactive_count += 1
-
-            if testcase.source == "ai":
-                interface_group.ai_count += 1
-            else:
-                interface_group.manual_count += 1
 
             module_summary = module_summary_map.get(testcase.module_id)
             if module_summary is None:
@@ -374,7 +434,7 @@ class TestCaseService:
         name = ensure_not_blank(name, "用例名称")
         if TestCaseService._looks_like_garbled_text(name):
             raise ServiceError("用例名称疑似乱码，请使用 UTF-8 中文后重试。")
-        source = ensure_choice(source, "用例来源", ["manual", "ai"])
+        source = "manual"
         description = str(description or "").strip()
 
         case_dict = parse_json_text(case_data, "用例 JSON")
@@ -410,7 +470,7 @@ class TestCaseService:
         name = ensure_not_blank(name, "用例名称")
         if TestCaseService._looks_like_garbled_text(name):
             raise ServiceError("用例名称疑似乱码，请使用 UTF-8 中文后重试。")
-        source = ensure_choice(source, "用例来源", ["manual", "ai"])
+        source = "manual"
         description = str(description or "").strip()
 
         case_dict = parse_json_text(case_data, "用例 JSON")

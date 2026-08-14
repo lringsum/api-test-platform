@@ -5,11 +5,35 @@ from app.services.base_service import ServiceError, commit_session, ensure_not_b
 
 class ModuleService:
     @staticmethod
-    def list_all(project_id=None):
+    def list_all(project_id=None, keyword="", kind=""):
         query = Module.query
         if project_id:
             query = query.filter_by(project_id=project_id)
-        return query.order_by(Module.created_at.desc()).all()
+        modules = query.order_by(Module.created_at.desc()).all()
+
+        normalized_keyword = str(keyword or "").strip().lower()
+        if normalized_keyword:
+            modules = [
+                module
+                for module in modules
+                if normalized_keyword in (module.name or "").lower()
+                or normalized_keyword in (module.description or "").lower()
+            ]
+
+        normalized_kind = str(kind or "").strip().lower()
+        if normalized_kind in {"api", "scenario", "mixed"}:
+            modules = [module for module in modules if ModuleService.kind_for(module) == normalized_kind]
+        return modules
+
+    @staticmethod
+    def kind_for(module):
+        has_api_cases = bool(module.testcases)
+        has_scenarios = bool(module.scenarios)
+        if has_api_cases and has_scenarios:
+            return "mixed"
+        if has_scenarios:
+            return "scenario"
+        return "api"
 
     @staticmethod
     def get_by_id(module_id):

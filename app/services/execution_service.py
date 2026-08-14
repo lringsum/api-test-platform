@@ -189,6 +189,42 @@ class ExecutionService:
         return detail
 
     @staticmethod
+    def add_details_batch(execution_id, detail_items):
+        execution = ExecutionService.get_by_id(execution_id)
+        prepared_details = []
+
+        for item in detail_items or []:
+            testcase_id = item.get("testcase_id")
+            testcase_name = item.get("testcase_name")
+
+            if testcase_id:
+                testcase = db.session.get(TestCase, testcase_id)
+                if not testcase:
+                    raise ServiceError("关联用例不存在。")
+                if ExecutionService._looks_like_garbled_text(testcase_name):
+                    testcase_name = testcase.name
+
+            detail = ExecutionDetail(
+                execution_id=execution.id,
+                testcase_id=testcase_id,
+                testcase_name=testcase_name,
+                status=item.get("status", "pending"),
+                error_message=item.get("error_message") or "",
+                duration_ms=item.get("duration_ms") or 0,
+            )
+            detail.request_data = item.get("request_data") or {}
+            detail.response_data = item.get("response_data") or {}
+            detail.assertion_data = item.get("assertion_data") or []
+            detail.extract_data = item.get("extract_data") or {}
+            prepared_details.append(detail)
+
+        if prepared_details:
+            db.session.add_all(prepared_details)
+            commit_session()
+
+        return prepared_details
+
+    @staticmethod
     def finish_execution(execution_id, status, total_count=0, passed_count=0, failed_count=0, total_duration_ms=0, summary=None):
         execution = ExecutionService.get_by_id(execution_id)
 
@@ -445,6 +481,7 @@ class ExecutionService:
         failed_count = 0
         total_duration_ms = 0
         failed_cases = []
+        detail_items = []
 
         for testcase in testcases:
             case_result = ExecutionService.execute_case(
@@ -453,17 +490,18 @@ class ExecutionService:
                 runtime_variables=runtime_variables,
             )
 
-            ExecutionService.add_detail(
-                execution_id=execution.id,
-                testcase_id=testcase.id,
-                testcase_name=testcase.name,
-                status=case_result["status"],
-                request_data=case_result["request_snapshot"],
-                response_data=case_result["response_snapshot"],
-                assertion_data=case_result["assertion_results"],
-                extract_data=case_result["extract_results"],
-                error_message=case_result["error_message"],
-                duration_ms=case_result["duration_ms"],
+            detail_items.append(
+                {
+                    "testcase_id": testcase.id,
+                    "testcase_name": testcase.name,
+                    "status": case_result["status"],
+                    "request_data": case_result["request_snapshot"],
+                    "response_data": case_result["response_snapshot"],
+                    "assertion_data": case_result["assertion_results"],
+                    "extract_data": case_result["extract_results"],
+                    "error_message": case_result["error_message"],
+                    "duration_ms": case_result["duration_ms"],
+                }
             )
 
             total_duration_ms += case_result["duration_ms"]
@@ -482,6 +520,11 @@ class ExecutionService:
                     extracted_values=case_result["extracted_values"],
                     persist_to_environment=True,
                 )
+
+        ExecutionService.add_details_batch(
+            execution_id=execution.id,
+            detail_items=detail_items,
+        )
 
         final_status = "passed" if failed_count == 0 else "failed"
         summary = {

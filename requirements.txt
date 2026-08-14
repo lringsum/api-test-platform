@@ -1,8 +1,12 @@
 Flask==3.0.3
 Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
 SQLAlchemy==2.0.30
+alembic==1.13.2
 psycopg2-binary==2.9.9
 requests==2.32.3
 pytest==8.3.2
 playwright==1.58.0
 pytest-playwright==0.7.2
+opencv-python-headless==4.10.0.84
+Appium-Python-Client==5.3.1

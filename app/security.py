@@ -100,7 +100,7 @@ def require_permission(*permission_codes, any_of=False):
 
             if not allowed:
                 flash("你没有访问该功能的权限。", "danger")
-                return redirect(url_for("dashboard.index"))
+                return redirect(url_for("auth.forbidden"))
             return func(*args, **kwargs)
 
         return wrapper
@@ -190,6 +190,8 @@ def set_active_project(project_id):
     if not project_id:
         session.pop(SESSION_PROJECT_KEY, None)
         g.active_project_id = None
+        return None
+    if not db.session.get(Project, project_id):
         return None
     if not can_access_project(user, project_id):
         return None
